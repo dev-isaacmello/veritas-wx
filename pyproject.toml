@@ -35,6 +35,11 @@ grib = [
 geo = [
     "rasterio>=1.3.10",
 ]
+# GraphCast/AIWP selective HDF5 reads over HTTP ranges (5.8 GB files — never whole)
+graphcast = [
+    "h5py>=3.11",
+    "h5netcdf>=1.3",
+]
 # Probabilistic scores (registered but not computed in Phase 1 — deterministic systems)
 scores = [
     "scoringrules>=0.7",

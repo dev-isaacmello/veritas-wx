@@ -33,23 +33,30 @@ models:
     format: grib2_index
   graphcast:
     source: "s3://noaa-oar-mlwp-data"
-    product: "GRAP_v100_GFS"   # stream GFS-init (D6); prefixo confirmado na auditoria
-    format: netcdf
+    product: "GRAP_v100_GFS"   # confirmado na auditoria (T2)
+    format: netcdf_hdf5
+    file_size_gb: 5.8          # POR RUN — leitura seletiva por range é obrigatória
+    known_missing_runs: 50     # 6.8%, 2026-04..06; ausência vira ausência de par (ADR-0002)
 
 observations:
   inmet:
-    api: "https://apitempo.inmet.gov.br"
-    fallback: bdmep_bulk
-    precip_priority: true      # pluviômetro horário INMET é a fonte primária de precip
+    # ADR-0002: bulk anual é a fonte PRIMÁRIA (apitempo horário degradado: 2xx vazio)
+    bulk: "https://portal.inmet.gov.br/uploads/dadoshistoricos/{year}.zip"
+    metadata_api: "https://apitempo.inmet.gov.br"   # /estacoes/T ainda funciona
+    fallback: bdmep
+    precip_priority: true
   isd:
+    # ADR-0002: NO-GO Fase 1 — arquivo NCEI congelado (última obs BR 2025-08-24)
+    status: excluded_phase1
     inventory: "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
-    format: isd_lite
 
 static:
   dem: "s3://copernicus-dem-30m"           # GLO-30, leitura COG por janela
-  koppen: "beck_2023_koppen_geiger_1km"    # URL fixada na auditoria
+  koppen: "https://figshare.com/ndownloader/files/61012822"  # Beck 2023 1km, CC-BY-4.0
   oni: "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
-  mjo_rmm: "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+  # ADR-0002: BoM congelado 2024-02; espelho IRI da MESMA série RMM é o primário
+  mjo_rmm: "https://iridl.ldeo.columbia.edu/SOURCES/.BoM/.MJO/.RMM/"
+  mjo_rmm_format_reference: "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
 
 match:
   max_delta_z_m: 500           # pares além disso: descartados e CONTADOS (nunca silencioso)
