@@ -86,7 +86,22 @@ analyze/         só funções puras: bootstrap em blocos, FDR BH, métricas pr�
                  t-tests AR(2)/HAC, climatologia por estação, peso por densidade
 ```
 
-## Como executar
+## Experimente em 2 minutos: previsão para a sua cidade
+
+```bash
+uv sync --group dev --group grib
+uv run python scripts/forecast_point.py --station "PORTO ALEGRE"
+```
+
+Busca a rodada 00Z de hoje (GFS + IFS HRES + AIFS, ~15 MB via byte-range) direto dos buckets
+oficiais, extrai no ponto da estação INMET e imprime o resumo diário dos 3 modelos lado a lado —
+com a leitura calibrada pela verificação (ex.: o viés quente medido do GFS). Funciona para
+qualquer uma das 1.118 estações da base (`--station "TORRES"`, `--station inmet:A801`, ...).
+
+Quando os modelos concordam, confiança alta; quando divergem em chuva forte, a verificação já
+mostrou em quem confiar. O valor cru dos modelos nunca é alterado.
+
+## Como executar (pipeline científico completo)
 
 Requer Python 3.12, [uv](https://docs.astral.sh/uv/), ~500 GB de disco e banda para o backfill
 completo (cada estágio é retomável; execuções parciais funcionam).
