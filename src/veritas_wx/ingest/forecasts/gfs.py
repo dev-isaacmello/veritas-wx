@@ -16,6 +16,7 @@ from veritas_wx.ingest.forecasts.gribidx import (
     IdxEntry,
     coalesce,
     parse_gfs_idx,
+    pick_gfs_apcp_bucket,
     select_gfs,
 )
 
@@ -51,7 +52,9 @@ def fetch_fields(
     """
     idx_text = client.get(idx_url(init, lead_hours, base), timeout=60.0)
     idx_text.raise_for_status()
-    selected = select_gfs(parse_gfs_idx(idx_text.text), wanted)
+    selected = pick_gfs_apcp_bucket(
+        select_gfs(parse_gfs_idx(idx_text.text), wanted), lead_hours
+    )
     if len(selected) < len(wanted):
         found = {(e.var, e.level) for e in selected}
         raise ValueError(

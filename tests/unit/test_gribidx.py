@@ -1,5 +1,7 @@
 """Golden tests for GRIB index parsing on realistic fixture excerpts."""
 
+import pytest
+
 from veritas_wx.ingest.forecasts.gribidx import (
     ECMWF_WANTED,
     GFS_WANTED,
@@ -7,6 +9,7 @@ from veritas_wx.ingest.forecasts.gribidx import (
     http_range,
     parse_ecmwf_index,
     parse_gfs_idx,
+    pick_gfs_apcp_bucket,
     select_ecmwf,
     select_gfs,
 )
@@ -62,6 +65,46 @@ def test_gfs_duplicate_descriptor_deduped_first_wins():
     apcp = [e for e in picked if e.var == "APCP"]
     assert len(apcp) == 1
     assert apcp[0].start == 4200000  # first occurrence kept
+
+
+GFS_IDX_F024 = """\
+1:0:d=2025080100:TMP:2 m above ground:24 hour fcst:
+2:1000000:d=2025080100:UGRD:10 m above ground:24 hour fcst:
+3:2000000:d=2025080100:VGRD:10 m above ground:24 hour fcst:
+4:3000000:d=2025080100:APCP:surface:0-24 hour acc fcst:
+5:3800000:d=2025080100:APCP:surface:18-24 hour acc fcst:
+6:4500000:d=2025080100:TMP:surface:24 hour fcst:
+"""
+
+
+def test_apcp_bucket_keeps_only_6h_window():
+    """Field-observed (M5 run): historical f024 carries 0-24 AND 18-24 acc;
+    both survive select_gfs (distinct metas) and the merged byte range makes
+    the decoder see duplicate 'tp'. Only the 6-h bucket may pass."""
+    picked = pick_gfs_apcp_bucket(select_gfs(parse_gfs_idx(GFS_IDX_F024)), lead_hours=24)
+    apcp = [e for e in picked if e.var == "APCP"]
+    assert len(apcp) == 1
+    assert apcp[0].meta == "18-24 hour acc fcst"
+    assert len(picked) == 4  # non-APCP fields untouched
+
+
+def test_apcp_bucket_lead6_zero_to_six():
+    picked = pick_gfs_apcp_bucket(select_gfs(parse_gfs_idx(GFS_IDX)), lead_hours=6)
+    apcp = [e for e in picked if e.var == "APCP"]
+    assert len(apcp) == 1 and apcp[0].meta == "0-6 hour acc fcst"
+
+
+def test_apcp_bucket_missing_raises_never_falls_back():
+    """A silent fallback to the 0-24 window would corrupt precip_24h sums."""
+    entries = select_gfs(parse_gfs_idx(GFS_IDX_F024))
+    only_total = [e for e in entries if e.meta != "18-24 hour acc fcst"]
+    with pytest.raises(ValueError, match="no APCP 6-h bucket"):
+        pick_gfs_apcp_bucket(only_total, lead_hours=24)
+
+
+def test_apcp_bucket_no_apcp_passthrough():
+    entries = [e for e in select_gfs(parse_gfs_idx(GFS_IDX)) if e.var != "APCP"]
+    assert pick_gfs_apcp_bucket(entries, lead_hours=6) == entries
 
 
 ECMWF_INDEX = (

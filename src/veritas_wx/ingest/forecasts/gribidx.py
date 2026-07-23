@@ -91,6 +91,36 @@ def select_gfs(
     return out
 
 
+def pick_gfs_apcp_bucket(entries: list[IdxEntry], lead_hours: int) -> list[IdxEntry]:
+    """Keep exactly ONE APCP entry: the 6-h bucket ``(lead-6)-lead hour acc``.
+
+    Historical pgrb2 files carry TWO APCP records at 6-hourly leads (e.g.
+    "0-24 hour acc" AND "18-24 hour acc" at f024). select_gfs() dedupes exact
+    descriptors but both survive when metas differ; fetching both makes the
+    decoder see duplicate 'tp' and refuse. The GFS precip convention
+    (PER_STEP_6H, match/precip.py) needs the 6-h bucket and nothing else.
+    Non-APCP entries pass through untouched. Raises when the bucket is absent
+    (a silent fallback to the wrong accumulation window would corrupt
+    precip_24h sums downstream).
+    """
+    wanted_meta = f"{lead_hours - 6}-{lead_hours} hour acc fcst"
+    out: list[IdxEntry] = []
+    apcp_found = False
+    for e in entries:
+        if e.var != "APCP":
+            out.append(e)
+        elif e.meta == wanted_meta:
+            out.append(e)
+            apcp_found = True
+    if any(e.var == "APCP" for e in entries) and not apcp_found:
+        metas = [e.meta for e in entries if e.var == "APCP"]
+        raise ValueError(
+            f"GFS f{lead_hours:03d}: no APCP 6-h bucket '{wanted_meta}' in idx "
+            f"(present: {metas})"
+        )
+    return out
+
+
 def parse_ecmwf_index(text: str) -> list[IdxEntry]:
     """Parse an ECMWF Open Data ``.index`` (JSON lines with _offset/_length)."""
     entries: list[IdxEntry] = []
