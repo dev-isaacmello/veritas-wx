@@ -56,8 +56,27 @@
 - [ ] Fallback BDMEP documentado (não implementado — bulk cobriu 100% da janela)
 - Nota p/ M4: 127 estações com cobertura t2m <50%; 118 incluídas sem dados na janela
 
-## M4 — QC completo + estações v1 (~500 finais)          [ ]
-## M5 — Thin slice GFS (1 mês × t2m × 20 estações)       [>]  runner+fetchers commitados; execução aguarda M3
-## M7 — Escala: 4 modelos × 12 meses => fact v1          [ ]
+## M4 — QC completo + estações v1                        [x]
+- [x] QC calibrado contra janela real (ADR-0003): sigma_floor no SPATIAL
+      (610k→11k flags), precip_1h isenta; obs_qc_v0.parquet (9.7M, 0 deleções)
+- [x] Corte v1 pré-registrado (t2m limpa ≥80%): 304 incluídas (~500 não
+      atingido; critério prevalece) + docs/stations_v1_report.md
+- [x] Política repr_floor: floor de TODAS as estações com obs limpa (14
+      células), pares só do conjunto v1
+
+## M5 — Thin slice GFS (ago/2025 × 3 vars × 20 estações) [x]
+- [x] Bug real capturado: APCP dual-record com metas distintas (0-24 + 18-24)
+      → pick_gfs_apcp_bucket força o bucket 6h, raise se ausente
+- [x] 62 inits × 40/40 leads, 145.080 pontos, 0 falhas de fetch, reconc. exata
+- [x] Mini-fact: 123.008 pares (22.072 obs_missing contados; 0 delta_z)
+- [x] Métricas com IC bootstrap (docs/m5_slice_report.md): t2m bias +1.2→+2.3 K,
+      RMSE 2.2→3.4 K; wind bias +1.4-1.7 m/s; precip ~0 (estação seca);
+      variance_ratio t2m 1.011 [0.977, 1.042]
+- Nota: variance_ratio precip degenera em mês seco (anotado no relatório)
+
+## M7 — Escala: 4 modelos × 12 meses => fact v1          [>]
+- [ ] Runner retomável por modelo×mês (manifest-driven, background)
+- [ ] GFS 12 meses · HRES/AIFS conforme retenção · GraphCast HDF5 seletivo
+- [ ] fact v1 particionado year/month/model + matched views
 ## M8 — 3 figuras + notebook + publicação dataset        [ ]
 ## M9 — serve/ (FastAPI read-only)                       [ ]
