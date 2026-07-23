@@ -75,8 +75,27 @@
 - Nota: variance_ratio precip degenera em mês seco (anotado no relatório)
 
 ## M7 — Escala: 4 modelos × 12 meses => fact v1          [>]
-- [ ] Runner retomável por modelo×mês (manifest-driven, background)
-- [ ] GFS 12 meses · HRES/AIFS conforme retenção · GraphCast HDF5 seletivo
-- [ ] fact v1 particionado year/month/model + matched views
+- [x] scale_ingest.py retomável por modelo×mês (skip se parquet lê limpo)
+- [x] GraphCast: leitura seletiva HDF5 por chunk (~280 MB/run vs 5.8 GB);
+      apcp em METROS detectado e convertido por unidade; eixo de tempo
+      validado por lead; 3 smokes live ok (corr 0.935 vs GFS t2m)
+- [x] Orografia ECMWF ('z' step 0 → m) p/ correção de elevação HRES/AIFS
+- [x] Validação live 304 estações: GFS 80s/init · HRES 117s · AIFS 108s ·
+      GraphCast 113s — reconciliação exata nos 4
+- [>] Backfill em execução: 10 jobs background (4 modelos × semestres),
+      ~2h/modelo-mês; retomável a qualquer momento
+- [ ] fact v1 (build_all --stages fact views figures, quando staged completo)
+
+## M8 — 3 figuras + notebook + publicação dataset        [>]
+- [x] make_figures.py: F1/H1 variance_ratio×lead (banda IC), F2/H2
+      bias_by_percentile (barras IC), F3/H3 tabela por regime — paleta
+      validada CVD, entidade→cor fixa, eixo capado (nunca a métrica) em
+      draws degenerados; validadas contra o fact do M5
+- [x] Slice já mostra direção da H2: bias precip negativo nos bins altos
+- [x] notebooks/report.ipynb (só exibe artefatos de código testado)
+- [x] build_all.py: pipeline completo em 1 comando (obs→qc→forecasts→fact→
+      views→figures) — critério de pronto #1
+- [ ] Rodada final das figuras com 4 modelos × 12 meses
+- [ ] Publicação do dataset (dry-run)
 ## M8 — 3 figuras + notebook + publicação dataset        [ ]
 ## M9 — serve/ (FastAPI read-only)                       [ ]

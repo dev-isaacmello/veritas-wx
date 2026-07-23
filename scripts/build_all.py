@@ -17,9 +17,66 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 MIN_FREE_GB = 20.0
+MODELS = ("gfs", "hres", "aifs", "graphcast")
 
-# name -> callable(config) — populated as milestones land (M3, M4, M5, M7...)
-STAGES: dict[str, object] = {}
+
+def _run(script: str, *args: str) -> None:
+    cmd = [sys.executable, str(REPO / "scripts" / script), *args]
+    print(f"[build_all] {' '.join(cmd[1:])}", file=sys.stderr)
+    subprocess.run(cmd, cwd=REPO, check=True)
+
+
+def stage_obs(cfg: dict) -> None:
+    """M3: INMET bulk zips -> obs_inmet_v0.parquet (idempotent via manifest)."""
+    _run("ingest_obs.py")
+
+
+def stage_qc(cfg: dict) -> None:
+    """M4: calibrated QC + stations v1 completeness cut."""
+    _run("run_qc.py")
+
+
+def stage_forecasts(cfg: dict) -> None:
+    """M7: all models x all window months (resumable; skips staged months)."""
+    for model in MODELS:
+        _run("scale_ingest.py", "--model", model, "--all-months")
+
+
+def stage_fact(cfg: dict) -> None:
+    """M7: staged forecast points x obs_qc -> fact v1 (one file per model)."""
+    for model in MODELS:
+        staged = sorted((REPO / "data/staged" / model).glob("*/forecast_points_*.parquet"))
+        if not staged:
+            print(f"[build_all] no staged months for {model}; skipping", file=sys.stderr)
+            continue
+        _run(
+            "build_fact.py",
+            "--forecast-points", *[str(p) for p in staged],
+            "--out", str(REPO / f"data/fact/fact_{model}.parquet"),
+        )
+
+
+def stage_views(cfg: dict) -> None:
+    """M7: exactly matched comparison views (non-negotiable #5)."""
+    facts = sorted((REPO / "data/fact").glob("fact_*.parquet"))
+    _run("build_views.py", "--fact", *[str(p) for p in facts])
+
+
+def stage_figures(cfg: dict) -> None:
+    """M8: the three pre-registered done-criterion figures."""
+    facts = sorted((REPO / "data/fact").glob("fact_*.parquet"))
+    _run("make_figures.py", "--fact", *[str(p) for p in facts])
+
+
+# name -> callable(config) — ORDER IS THE PIPELINE
+STAGES: dict[str, object] = {
+    "obs": stage_obs,
+    "qc": stage_qc,
+    "forecasts": stage_forecasts,
+    "fact": stage_fact,
+    "views": stage_views,
+    "figures": stage_figures,
+}
 
 
 def load_config() -> dict:
