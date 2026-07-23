@@ -8,6 +8,7 @@ from veritas_wx.contracts.validate import validate
 from veritas_wx.ingest.static.stations import (
     count_cells_with_min_stations,
     dedupe_cross_network,
+    exclude_network_phase1,
     flag_elev_review,
     flag_out_of_bbox,
     haversine_km,
@@ -196,6 +197,32 @@ def test_bbox_rule_null_coords_and_existing_exclusions():
     assert (nul["status"], nul["exclusion_reason"]) == ("excluded", "invalid_coords")
     # an earlier exclusion reason is never overwritten
     assert row(out, "inmet:A778")["exclusion_reason"] == "inactive"
+
+
+# -- whole-network exclusion (ADR-0002 §1: ISD archive frozen) ---------------
+
+
+def test_exclude_network_phase1_benches_isd_keeps_inmet():
+    df = frame(
+        [
+            station("inmet:A001", -15.0, -48.0),
+            station("isd:820980-99999", -1.4, -48.4),
+            station("isd:829830-99999", -23.0, -47.1, status="review"),
+            station(
+                "isd:834840-99999", -35.5, -55.0, status="excluded", exclusion_reason="inactive"
+            ),
+        ]
+    )
+    out = exclude_network_phase1(df, "isd", "isd_archive_frozen")
+
+    assert row(out, "inmet:A001")["status"] == "included"
+    benched = row(out, "isd:820980-99999")
+    assert (benched["status"], benched["exclusion_reason"]) == ("excluded", "isd_archive_frozen")
+    # a frozen archive trumps a pending review
+    review = row(out, "isd:829830-99999")
+    assert (review["status"], review["exclusion_reason"]) == ("excluded", "isd_archive_frozen")
+    # an earlier exclusion reason is never overwritten (first cause wins)
+    assert row(out, "isd:834840-99999")["exclusion_reason"] == "inactive"
 
 
 # -- elevation mismatch => review queue (R6) ---------------------------------

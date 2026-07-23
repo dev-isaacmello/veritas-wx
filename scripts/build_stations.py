@@ -154,6 +154,16 @@ def main() -> None:
         status=status_counts(df),
     )
 
+    # -- ADR-0002 §1: ISD out of Phase 1 (NCEI archive frozen 2025-08) -------
+    n = df.height
+    df = stations.exclude_network_phase1(df, "isd", "isd_archive_frozen")
+    log_stage(
+        "t3.exclude_isd_phase1",
+        rows_in=n,
+        rows_out=df.height,
+        status=status_counts(df),
+    )
+
     # -- DEM elevation (Copernicus GLO-30, COG window reads) -----------------
     lookup_df = df.filter(
         (pl.col("status") != "excluded")

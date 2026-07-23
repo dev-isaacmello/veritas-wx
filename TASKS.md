@@ -30,9 +30,12 @@
 - [x] Dedupe entre redes (513 cross_ref; 264 excluídas como duplicatas)
 - [x] Cross-check elevação vs Copernicus GLO-30 (444 tiles COG; 1 falha)
 - [x] Köppen (Beck 2023 1km, figshare CC-BY-4.0)
-- [x] 94 células 0.25° com ≥2 estações (R7 verificado — repr_floor viável)
-- [x] data/static/stations_v0.parquet validando STATIONS_V1 (1118 total, 854 incluídas)
-- [x] Relatório: docs/stations_curation_v0.md + fila de revisão |Δelev|>100 m (15)
+- [x] ISD benched pós-ADR-0002: exclusion_reason="isd_archive_frozen" (446 exc.)
+- [x] R7 verificado INMET-only: 15 células ≥2 estações (94 de ontem inflado por
+      pares INMET↔ISD); efetivas COM dados: 14; com t2m ≥50%: 10 — repr_floor
+      estimável (pooling temporal) mas com diversidade espacial limitada
+- [x] data/static/stations_v0.parquet validando STATIONS_V1 (1118 total, 666 incluídas)
+- [x] Relatório: docs/stations_curation_v0.md + fila de revisão |Δelev|>100 m (6)
 
 ## M6 — Analyze core (paralelo; puro)                    [x]
 - [x] analyze/bootstrap.py: moving block (blocos de dias), Politis–White clamp [2,30]
@@ -44,11 +47,14 @@
 - [x] analyze/strata.py + ingest/static/indices.py (ONI, MJO RMM via espelho IRI)
 - [x] Nenhuma função pública retorna estimativa sem IC (teste de API)
 
-## M3 — Obs ingest (INMET bulk, janela completa)         [>]  INMET-only (ADR-0002)
-- [ ] ingest/observations/inmet_bulk.py: zips anuais dadoshistoricos (2025+2026)
-- [ ] Raw no HD com sha256 no manifest; parse → OBS_V1 parquet
-- [ ] Reconciliação: linhas lidas = escritas + rejeitadas POR MOTIVO
-- [ ] Fallback BDMEP documentado (não implementado se bulk cobrir tudo)
+## M3 — Obs ingest (INMET bulk, janela completa)         [x]  INMET-only (ADR-0002)
+- [x] ingest/observations/inmet_bulk.py: zips anuais dadoshistoricos (2025+2026)
+- [x] Raw no HD com sha256 no manifest; parse → OBS_V1 parquet
+- [x] Reconciliação exata em todos os stages (parse/clip/dedupe; 0 conflitos)
+- [x] data/obs/obs_inmet_v0.parquet: 9.705.180 linhas, 548 estações com dados
+- [x] Formato validado contra zip real (643 CSVs; ',8'; vazio E -9999 = missing)
+- [ ] Fallback BDMEP documentado (não implementado — bulk cobriu 100% da janela)
+- Nota p/ M4: 127 estações com cobertura t2m <50%; 118 incluídas sem dados na janela
 
 ## M4 — QC completo + estações v1 (~500 finais)          [ ]
 ## M5 — Thin slice GFS (1 mês × t2m × 20 estações)       [>]  runner+fetchers commitados; execução aguarda M3

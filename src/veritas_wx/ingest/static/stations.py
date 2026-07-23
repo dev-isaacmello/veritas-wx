@@ -376,6 +376,21 @@ def flag_out_of_bbox(df: pl.DataFrame, bbox: dict[str, float] | None = None) -> 
     )
 
 
+def exclude_network_phase1(df: pl.DataFrame, network: str, reason: str) -> pl.DataFrame:
+    """ADR-0002 §1: bench a whole network (e.g. ISD, archive frozen) as excluded.
+
+    Rows stay in the table — the dormant network can return in a later phase —
+    and already-excluded rows keep their original reason (first cause wins).
+    Applies to 'review' rows too: a frozen archive trumps a pending review.
+    Pure: same rows out, only status/exclusion_reason change.
+    """
+    hit = (pl.col("network") == network) & (pl.col("status") != "excluded")
+    return df.with_columns(
+        exclusion_reason=pl.when(hit).then(pl.lit(reason)).otherwise(pl.col("exclusion_reason")),
+        status=pl.when(hit).then(pl.lit("excluded")).otherwise(pl.col("status")),
+    )
+
+
 def flag_elev_review(df: pl.DataFrame, max_diff_m: float = 100.0) -> pl.DataFrame:
     """Curation v0 (risk R6): |elev_station - elev_dem| > max_diff_m => status="review".
 
