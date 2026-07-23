@@ -3180,6 +3180,7 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "s3fs" },
+    { name = "scipy" },
     { name = "xarray" },
     { name = "zarr" },
 ]
@@ -3221,6 +3222,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=17" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "s3fs", specifier = ">=2024.6" },
+    { name = "scipy", specifier = ">=1.13" },
     { name = "xarray", specifier = ">=2024.6" },
     { name = "zarr", specifier = ">=2.18" },
 ]
