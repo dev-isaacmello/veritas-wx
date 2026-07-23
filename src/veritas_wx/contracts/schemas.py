@@ -13,6 +13,9 @@ UTC_US = pl.Datetime(time_unit="us", time_zone="UTC")
 
 MODELS: tuple[str, ...] = ("aifs", "gfs", "graphcast", "hres")
 VARIABLES: tuple[str, ...] = ("t2m", "wind10m", "precip_24h", "dewpoint")
+# Observation-stage variables are hourly; precip_24h is DERIVED at match time
+# from >=22 valid hourly precip_1h readings (never assume missing hour == 0).
+OBS_VARIABLES: tuple[str, ...] = ("t2m", "wind10m", "precip_1h", "dewpoint")
 INTERP_METHODS: tuple[str, ...] = ("nearest", "bilinear")
 NETWORKS: tuple[str, ...] = ("inmet", "isd")
 
