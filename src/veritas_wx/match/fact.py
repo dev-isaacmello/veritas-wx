@@ -11,7 +11,10 @@ PLAN.md §2.5):
   - pair qc_flags: t2m/wind10m -> the hour's flags; precip_24h -> bitwise OR
     over ALL hours in the window (flagged-excluded hours still surface their
     bits so a degraded window is visible to consumers).
-  - fcst_elev_adj: lapse-rate correction, t2m only; NULL otherwise.
+  - fcst_elev_adj: lapse-rate correction for t2m; Ingleby wind altitude
+    factor for wind10m (delta_z = elev_station - grid_elev, adjusted only
+    when the station sits > 100 m above the model orography, factor 1.0
+    otherwise); NULL for other variables and when delta_z is NULL.
   - |delta_z| > max_delta_z pairs are dropped AND counted.
   - repr_floor attached per (cell, variable); NULL where not estimable.
 """
@@ -19,7 +22,12 @@ PLAN.md §2.5):
 import polars as pl
 
 from veritas_wx.contracts import FACT_V1, qc_bits, validate
-from veritas_wx.match.elevation import LAPSE_RATE_K_PER_M
+from veritas_wx.match.elevation import (
+    LAPSE_RATE_K_PER_M,
+    WIND_FACTOR_MAX,
+    WIND_FACTOR_PER_M,
+    WIND_ONSET_DELTA_Z_M,
+)
 from veritas_wx.match.repr_floor import attach_repr_floor
 
 _OBS_JOIN_COLS = ["station_id", "valid_time", "variable"]
@@ -121,9 +129,14 @@ def build_fact(
         pl.col("delta_z").abs().le(max_delta_z_m) | pl.col("delta_z").is_null()
     )
 
+    wind_factor = 1.0 + WIND_FACTOR_PER_M * (pl.col("delta_z") - WIND_ONSET_DELTA_Z_M).clip(
+        0.0, (WIND_FACTOR_MAX - 1.0) / WIND_FACTOR_PER_M
+    )
     paired = paired.with_columns(
         pl.when(pl.col("variable") == "t2m")
         .then(pl.col("value") - LAPSE_RATE_K_PER_M * pl.col("delta_z"))
+        .when(pl.col("variable") == "wind10m")
+        .then(pl.col("value") * wind_factor)
         .otherwise(None)
         .alias("fcst_elev_adj")
     )

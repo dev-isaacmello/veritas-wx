@@ -1,10 +1,22 @@
-"""Golden + property tests for the lapse-rate correction (non-negotiable #2)."""
+"""Golden + property tests for the elevation corrections.
+
+Lapse-rate correction for temperature (non-negotiable #2) and the Ingleby
+(2014, section 3.3) wind altitude factor ported from WeatherBench-X
+(ADR-0004 item 1).
+"""
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from veritas_wx.match.elevation import LAPSE_RATE_K_PER_M, delta_z, lapse_adjust
+from veritas_wx.match.elevation import (
+    LAPSE_RATE_K_PER_M,
+    WIND_FACTOR_MAX,
+    adjust_wind,
+    delta_z,
+    lapse_adjust,
+    wind_altitude_factor,
+)
 
 
 def test_plan_golden_example():
@@ -51,3 +63,64 @@ def test_monotonic_decreasing_in_delta_z(t, dz1, dz2):
 def test_adjustment_is_linear_and_invertible(t, dz):
     adjusted = lapse_adjust(t, dz)
     assert lapse_adjust(adjusted, -dz) == pytest.approx(t)
+
+
+def test_wind_factor_goldens_by_hand():
+    """Hand-computed values of 1 + 0.002 * (dz - 100), saturating at 3.0.
+
+    delta_z = elev_station - grid_elev (FACT_V1 convention, positive when
+    the station sits above the model orography). The 100 m onset is
+    subtracted inside the slope, exactly as in the WeatherBench-X source:
+      dz = 600  => 1 + 0.002 * 500  = 2.0
+      dz = 300  => 1 + 0.002 * 200  = 1.4
+      dz = 1100 => 1 + 0.002 * 1000 = 3.0 (saturation begins exactly here)
+    """
+    assert wind_altitude_factor(600.0) == pytest.approx(2.0)
+    assert wind_altitude_factor(300.0) == pytest.approx(1.4)
+    assert wind_altitude_factor(1100.0) == pytest.approx(3.0)
+
+
+def test_wind_factor_saturates_at_three():
+    assert wind_altitude_factor(1500.0) == pytest.approx(3.0)
+    assert wind_altitude_factor(10000.0) == pytest.approx(WIND_FACTOR_MAX)
+
+
+def test_wind_factor_no_adjustment_at_or_below_onset():
+    """Stations below, level with, or < 100 m above the grid get factor 1."""
+    assert wind_altitude_factor(-200.0) == 1.0
+    assert wind_altitude_factor(0.0) == 1.0
+    assert wind_altitude_factor(50.0) == 1.0
+    assert wind_altitude_factor(100.0) == 1.0
+
+
+def test_wind_factor_continuous_at_onset():
+    assert wind_altitude_factor(100.0 + 1e-9) == pytest.approx(1.0)
+
+
+def test_adjust_wind_golden():
+    """5 m/s at a station 300 m above the model orography => 5 * 1.4 = 7 m/s."""
+    assert adjust_wind(5.0, 300.0) == pytest.approx(7.0)
+    assert adjust_wind(5.0, -400.0) == pytest.approx(5.0)
+
+
+@given(st.floats(min_value=-2000.0, max_value=2000.0))
+def test_wind_factor_bounded(dz):
+    assert 1.0 <= wind_altitude_factor(dz) <= WIND_FACTOR_MAX
+
+
+@given(
+    st.floats(min_value=-2000.0, max_value=2000.0),
+    st.floats(min_value=-2000.0, max_value=2000.0),
+)
+def test_wind_factor_monotonic_nondecreasing(dz1, dz2):
+    """Higher station relative to cell => equal or larger speed-up factor."""
+    lo, hi = sorted([dz1, dz2])
+    assert wind_altitude_factor(lo) <= wind_altitude_factor(hi)
+
+
+@given(
+    st.floats(min_value=0.0, max_value=60.0),
+    st.floats(min_value=-2000.0, max_value=2000.0),
+)
+def test_adjust_wind_never_reduces_speed(speed, dz):
+    assert adjust_wind(speed, dz) >= speed

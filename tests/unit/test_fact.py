@@ -112,10 +112,41 @@ def test_build_fact_end_to_end_accounting():
     by_var = {r["variable"]: r for r in fact.to_dicts()}
     assert by_var["t2m"]["delta_z"] == pytest.approx(-400.0)
     assert by_var["t2m"]["fcst_elev_adj"] == pytest.approx(292.6)
-    assert by_var["wind10m"]["fcst_elev_adj"] is None
+    assert by_var["wind10m"]["fcst_elev_adj"] == pytest.approx(5.0)
     assert by_var["precip_24h"]["obs"] == pytest.approx(24.0)
     assert all(r["ingest_version"] == "v-test" for r in fact.to_dicts())
     assert by_var["t2m"]["repr_floor"] is None
+
+
+def test_build_fact_wind_gains_ingleby_adjustment_above_onset():
+    """Station A at 800 m over a 500 m cell: dz = +300 => factor 1.4 => 5 -> 7 m/s.
+
+    The station-below-grid twin (dz = -400) keeps factor 1.0: adjusted equals
+    raw, never NULL, so consumers can always read fcst_elev_adj for wind10m
+    when delta_z is known.
+    """
+    fps = _fp(
+        [
+            {"variable": "wind10m", "value": 5.0, "grid_elev": 500.0},
+            {"variable": "wind10m", "value": 5.0, "station_id": "inmet:B",
+             "grid_elev": 410.0},
+        ]
+    )
+    obs_rows = [
+        {"station_id": "inmet:A", "valid_time": VT, "variable": "wind10m", "value": 6.0,
+         "source": "inmet", "source_qc_raw": None, "ingest_version": "test", "qc_flags": 0},
+        {"station_id": "inmet:B", "valid_time": VT, "variable": "wind10m", "value": 4.0,
+         "source": "inmet", "source_qc_raw": None, "ingest_version": "test", "qc_flags": 0},
+    ]
+    fact, dropped = build_fact(fps, _obs(obs_rows), _stations())
+
+    assert sum(dropped.values()) == 0
+    by_sid = {r["station_id"]: r for r in fact.to_dicts()}
+    assert by_sid["inmet:A"]["delta_z"] == pytest.approx(300.0)
+    assert by_sid["inmet:A"]["fcst_elev_adj"] == pytest.approx(7.0)
+    assert by_sid["inmet:A"]["fcst_raw"] == pytest.approx(5.0)
+    assert by_sid["inmet:B"]["delta_z"] == pytest.approx(-400.0)
+    assert by_sid["inmet:B"]["fcst_elev_adj"] == pytest.approx(5.0)
 
 
 def test_build_fact_attaches_repr_floor_when_available():
