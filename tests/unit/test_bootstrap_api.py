@@ -30,9 +30,6 @@ def _frame(n_days: int, rows_per_day: int = 3, seed: int = 0) -> pl.DataFrame:
     )
 
 
-# ---------------------------------------------------------------------------
-# optimal_block_length / resolve_block_len
-# ---------------------------------------------------------------------------
 def test_constant_series_gives_one():
     assert optimal_block_length(np.full(200, 3.14)) == 1.0
 
@@ -40,7 +37,7 @@ def test_constant_series_gives_one():
 def test_iid_series_gives_small_value():
     rng = np.random.default_rng(7)
     b = optimal_block_length(rng.normal(size=500))
-    assert b <= 3.0  # no dependence => tiny optimal block
+    assert b <= 3.0
 
 
 def test_ar1_series_gives_larger_block_than_iid():
@@ -62,9 +59,8 @@ def test_tiny_series_degenerates_to_one():
 
 def test_resolve_block_len_clamps_to_registry_range():
     rng = np.random.default_rng(1)
-    assert resolve_block_len(rng.normal(size=300)) == 2  # iid: ceil(1.0)=1 -> clamped up
-    assert resolve_block_len(np.full(100, 5.0)) == 2  # constant -> clamped up
-    # strongly dependent series clamped at the registry ceiling
+    assert resolve_block_len(rng.normal(size=300)) == 2
+    assert resolve_block_len(np.full(100, 5.0)) == 2
     n = 2000
     x = np.empty(n)
     x[0] = 0.0
@@ -75,9 +71,6 @@ def test_resolve_block_len_clamps_to_registry_range():
     assert resolve_block_len(x, clamp=(2, 10)) <= 10
 
 
-# ---------------------------------------------------------------------------
-# moving_block_bootstrap API
-# ---------------------------------------------------------------------------
 def test_ci_brackets_estimate_on_random_data():
     df = _frame(60, rows_per_day=4, seed=42)
     res = moving_block_bootstrap(
@@ -149,9 +142,8 @@ def test_repeated_days_visible_with_unequal_rows_per_day():
     res = moving_block_bootstrap(
         df, stat, "day", np.random.default_rng(31), n_boot=200, block_len=1
     )
-    # if repeats were deduplicated, every draw would be <= 29 and constant
     assert len(np.unique(res.draws)) > 1
-    assert res.draws.max() > df.height  # fat day drawn more than once at least once
+    assert res.draws.max() > df.height
 
 
 def test_block_len_none_requires_error_column():
@@ -165,7 +157,7 @@ def test_block_len_none_resolves_from_daily_error_series():
     res = moving_block_bootstrap(
         df, _mean_error, "day", np.random.default_rng(4), n_boot=50
     )
-    assert 2 <= res.block_len_days <= 30  # registry clamp respected
+    assert 2 <= res.block_len_days <= 30
 
 
 def test_block_len_longer_than_series_is_truncated():

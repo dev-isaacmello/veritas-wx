@@ -28,9 +28,8 @@ GFS_IDX = """\
 def test_gfs_idx_parse_and_ranges():
     entries = parse_gfs_idx(GFS_IDX)
     assert len(entries) == 7
-    # stop of message N is start of message N+1
     assert entries[0].start == 0 and entries[0].stop == 990253
-    assert entries[-1].stop is None  # last message runs to EOF
+    assert entries[-1].stop is None
 
 
 def test_gfs_select_wanted_fields_only():
@@ -41,7 +40,6 @@ def test_gfs_select_wanted_fields_only():
         ("VGRD", "10 m above ground"),
         ("APCP", "surface"),
     ]
-    # surface TMP (skin temperature) must NOT be picked despite var name match
     assert all(not (e.var == "TMP" and e.level == "surface") for e in picked)
 
 
@@ -54,17 +52,15 @@ def test_http_range_header_is_inclusive():
 def test_coalesce_merges_contiguous_messages():
     picked = select_gfs(parse_gfs_idx(GFS_IDX))
     merged = coalesce(picked)
-    # TMP/UGRD/VGRD/APCP are contiguous (1020000..4900000) -> single range
     assert merged == [(1020000, 4900000)]
 
 
 def test_gfs_duplicate_descriptor_deduped_first_wins():
-    # field-observed NCEP quirk: identical APCP descriptor at two offsets
     dup = GFS_IDX + "8:5500000:d=2025070100:APCP:surface:0-6 hour acc fcst:\n"
     picked = select_gfs(parse_gfs_idx(dup))
     apcp = [e for e in picked if e.var == "APCP"]
     assert len(apcp) == 1
-    assert apcp[0].start == 4200000  # first occurrence kept
+    assert apcp[0].start == 4200000
 
 
 GFS_IDX_F024 = """\
@@ -85,7 +81,7 @@ def test_apcp_bucket_keeps_only_6h_window():
     apcp = [e for e in picked if e.var == "APCP"]
     assert len(apcp) == 1
     assert apcp[0].meta == "18-24 hour acc fcst"
-    assert len(picked) == 4  # non-APCP fields untouched
+    assert len(picked) == 4
 
 
 def test_apcp_bucket_lead6_zero_to_six():
@@ -123,13 +119,12 @@ def test_ecmwf_index_parse_and_step_selection():
     entries = parse_ecmwf_index(ECMWF_INDEX)
     assert len(entries) == 4
     step6 = select_ecmwf(entries, step=6)
-    assert sorted(e.var for e in step6) == ["2t", "tp"]  # msl unwanted; step 12 excluded
+    assert sorted(e.var for e in step6) == ["2t", "tp"]
     t2 = next(e for e in step6 if e.var == "2t")
     assert (t2.start, t2.stop) == (1000, 1500)
     assert http_range(t2) == "bytes=1000-1499"
 
 
 def test_wanted_sets_cover_phase1_variables():
-    # t2m, wind (u+v), precip — the Phase 1 contract
     assert {v for v, _ in GFS_WANTED} == {"TMP", "UGRD", "VGRD", "APCP"}
     assert ECMWF_WANTED == {"2t", "10u", "10v", "tp"}

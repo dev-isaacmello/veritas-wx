@@ -30,8 +30,8 @@ def tile_id(lat: float, lon: float) -> str:
 
 def _tile_urls(tile: str) -> list[str]:
     return [
-        f"s3://{DEM_BUCKET}/{tile}/{tile}.tif",  # unsigned S3 (preferred)
-        f"{DEM_HTTPS_BASE}/{tile}/{tile}.tif",  # plain HTTPS fallback
+        f"s3://{DEM_BUCKET}/{tile}/{tile}.tif",
+        f"{DEM_HTTPS_BASE}/{tile}/{tile}.tif",
     ]
 
 
@@ -49,7 +49,7 @@ def _sample_tile(
     clamped into the valid range instead — an offset of at most one pixel
     (~30 m), never an invented elevation.
     """
-    import rasterio  # local import: worker threads need their own GDAL env
+    import rasterio
     from rasterio.windows import Window
 
     errors: list[str] = []
@@ -68,7 +68,7 @@ def _sample_tile(
                     out[sid] = float(block[0, 0])
                 transport = "s3" if url.startswith("s3://") else "https"
                 return out, transport, None
-        except Exception as exc:  # rasterio raises various IO error types
+        except Exception as exc:
             errors.append(f"{url}: {type(exc).__name__}: {exc}")
     return {sid: None for sid, _, _ in points}, None, " | ".join(errors)
 

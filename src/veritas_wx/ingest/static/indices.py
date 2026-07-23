@@ -42,7 +42,7 @@ def parse_oni(text: str) -> tuple[pl.DataFrame, dict[str, int]]:
     for line in text.splitlines():
         parts = line.split()
         if len(parts) != 4 or parts[0] not in _ONI_CENTER_MONTH:
-            continue  # headers/blank lines are expected, not drops
+            continue
         try:
             rows.append(
                 {
@@ -64,11 +64,11 @@ def parse_rmm(text: str) -> tuple[pl.DataFrame, dict[str, int]]:
     for line in text.splitlines():
         parts = line.split()
         if len(parts) < 7:
-            continue  # header/prose lines
+            continue
         try:
             year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
         except ValueError:
-            continue  # header line starting with text
+            continue
         try:
             rmm1, rmm2 = float(parts[3]), float(parts[4])
             phase, amplitude = int(float(parts[5])), float(parts[6])

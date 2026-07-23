@@ -23,7 +23,7 @@ TRUE_MEAN = 0.0
 def _ar1_series(rng: np.random.Generator, n: int, phi: float, sigma: float = 1.0) -> np.ndarray:
     """Stationary AR(1) with mean 0: x_t = phi * x_{t-1} + eps_t."""
     x = np.empty(n)
-    x[0] = rng.normal(0.0, sigma / np.sqrt(1.0 - phi**2))  # stationary initial draw
+    x[0] = rng.normal(0.0, sigma / np.sqrt(1.0 - phi**2))
     eps = rng.normal(0.0, sigma, n)
     for t in range(1, n):
         x[t] = phi * x[t - 1] + eps[t]
@@ -75,7 +75,6 @@ def test_block_bootstrap_covers_and_beats_iid_on_ar1():
         f"iid coverage {cov_iid:.3f} not below block coverage {cov_block:.3f} — "
         "blocks are not buying anything"
     )
-    # at phi=0.5 the iid CI is ~sqrt(3) too narrow; its coverage must be visibly bad
     assert cov_iid < 0.90, f"iid coverage {cov_iid:.3f} suspiciously high on AR(1)"
 
 

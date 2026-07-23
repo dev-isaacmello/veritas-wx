@@ -22,12 +22,12 @@ def test_season_golden():
     df = pl.DataFrame(
         {
             "valid_time": [
-                _ts(2026, 1, 15),  # DJF
-                _ts(2026, 2, 28),  # DJF
-                _ts(2025, 12, 1),  # DJF
-                _ts(2026, 4, 10),  # MAM
-                _ts(2025, 7, 4),  # JJA
-                _ts(2025, 10, 31),  # SON
+                _ts(2026, 1, 15),
+                _ts(2026, 2, 28),
+                _ts(2025, 12, 1),
+                _ts(2026, 4, 10),
+                _ts(2025, 7, 4),
+                _ts(2025, 10, 31),
             ]
         },
         schema={"valid_time": pl.Datetime("us", "UTC")},
@@ -53,9 +53,8 @@ def test_obs_percentile_series_1_to_100():
         }
     )
     out = obs_percentile(df)
-    assert out.height == 100  # no rows gained or lost
+    assert out.height == 100
     assert out["obs_pct"].to_list() == pytest.approx([float(v) for v in range(1, 101)])
-    # extremes: min -> 1.0 (not 0), max -> exactly 100 (falls in closed bin 99-100)
     assert out["obs_pct"].min() == pytest.approx(1.0)
     assert out["obs_pct"].max() == pytest.approx(100.0)
 
@@ -69,7 +68,6 @@ def test_obs_percentile_is_per_station_and_variable():
         }
     )
     out = obs_percentile(df)
-    # each group of 2: ranks 1,2 => 50, 100 — independent of the other station's scale
     assert out["obs_pct"].to_list() == pytest.approx([50.0, 100.0, 50.0, 100.0])
 
 
@@ -78,7 +76,6 @@ def test_obs_percentile_ties_get_average_rank():
         {"station_id": ["s"] * 4, "variable": ["t2m"] * 4, "obs": [1.0, 2.0, 2.0, 3.0]}
     )
     out = obs_percentile(df)
-    # ranks: 1, 2.5, 2.5, 4 over n=4 => 25, 62.5, 62.5, 100
     assert out["obs_pct"].to_list() == pytest.approx([25.0, 62.5, 62.5, 100.0])
 
 
@@ -91,7 +88,7 @@ def test_join_koppen_level1():
         }
     )
     out = join_koppen(df, stations)
-    assert out.height == 3  # left join: nothing dropped
+    assert out.height == 3
     assert out["koppen"].to_list() == ["Aw", "Cfb", None]
     assert out["koppen_level1"].to_list() == ["A", "C", None]
 
@@ -120,11 +117,11 @@ def test_join_enso_thresholds():
     out = join_enso(df, oni)
     assert out.height == 5
     assert out["enso_phase"].to_list() == [
-        "el_nino",  # exactly 0.5 => el_nino (>=)
-        "la_nina",  # exactly -0.5 => la_nina (<=)
+        "el_nino",
+        "la_nina",
         "neutral",
         "neutral",
-        None,  # month absent from the ONI table
+        None,
     ]
 
 
@@ -144,5 +141,4 @@ def test_join_mjo_phase_and_inactive():
     )
     out = join_mjo(df, rmm)
     assert out.height == 3
-    # amplitude >= 1 => phase label; < 1 => inactive; missing day => null
     assert out["mjo_phase"].to_list() == ["3", "inactive", None]

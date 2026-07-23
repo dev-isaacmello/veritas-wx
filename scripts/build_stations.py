@@ -43,7 +43,7 @@ OUT_PARQUET = REPO_ROOT / "data/static/stations_v0.parquet"
 RAW_DIR = REPO_ROOT / "data/static/raw"
 REPORT_PATH = REPO_ROOT / "docs/stations_curation_v0.md"
 
-BRAZIL_CELLS_REF = 13_600  # ~number of 0.25 deg cells over Brazil (PLAN, risk R7)
+BRAZIL_CELLS_REF = 13_600
 
 
 def compute_ingest_version() -> str:
@@ -82,7 +82,6 @@ def status_counts(df: pl.DataFrame) -> dict[str, int]:
 
 def reason_counts(df: pl.DataFrame, status: str) -> dict[str, int]:
     sub = df.filter(pl.col("status") == status)
-    # collapse duplicate_of:<id> into one family for readable logs
     reasons = sub.with_columns(
         reason=pl.when(pl.col("exclusion_reason").str.starts_with("duplicate_of:"))
         .then(pl.lit("duplicate_of:*"))
@@ -104,7 +103,6 @@ def main() -> None:
     ingest_version = compute_ingest_version()
     build_date = datetime.now(UTC).date().isoformat()
 
-    # -- fetch ---------------------------------------------------------------
     inmet_records = stations.fetch_inmet_stations()
     log_stage(
         "t3.fetch_inmet",
@@ -122,7 +120,6 @@ def main() -> None:
         source=stations.ISD_HISTORY_URL,
     )
 
-    # -- canonical (applies the INMET inactive rule) -------------------------
     df = stations.to_canonical(
         inmet_records,
         isd_raw,
@@ -138,12 +135,10 @@ def main() -> None:
         status=status_counts(df),
     )
 
-    # -- curation: Brazil bounding box --------------------------------------
     n = df.height
     df = stations.flag_out_of_bbox(df)
     log_stage("t3.curation_bbox", rows_in=n, rows_out=df.height, status=status_counts(df))
 
-    # -- curation: cross-network dedupe (<2 km => same site, INMET wins) -----
     n = df.height
     df = stations.dedupe_cross_network(df, max_km=2.0)
     log_stage(
@@ -154,7 +149,6 @@ def main() -> None:
         status=status_counts(df),
     )
 
-    # -- ADR-0002 §1: ISD out of Phase 1 (NCEI archive frozen 2025-08) -------
     n = df.height
     df = stations.exclude_network_phase1(df, "isd", "isd_archive_frozen")
     log_stage(
@@ -164,7 +158,6 @@ def main() -> None:
         status=status_counts(df),
     )
 
-    # -- DEM elevation (Copernicus GLO-30, COG window reads) -----------------
     lookup_df = df.filter(
         (pl.col("status") != "excluded")
         & pl.col("lat").is_not_null()
@@ -193,7 +186,6 @@ def main() -> None:
         transports=dem_stats["transports"],
     )
 
-    # -- curation: elevation mismatch => manual review queue (R6) ------------
     n = df.height
     df = stations.flag_elev_review(df, max_diff_m=max_elev_diff_m)
     log_stage(
@@ -204,7 +196,6 @@ def main() -> None:
         status=status_counts(df),
     )
 
-    # -- Köppen (Beck et al. 2023, 1991-2020, 1 km) --------------------------
     raster_path, koppen_info = koppen.download_koppen_raster(RAW_DIR)
     if raster_path is not None:
         kop_targets = df.filter(
@@ -238,7 +229,6 @@ def main() -> None:
         sources_attempted=koppen_info.get("attempted", []),
     )
 
-    # -- R7 early check: 0.25 deg cells with >= 2 included stations ----------
     n_cells_ge2 = stations.count_cells_with_min_stations(df, res=0.25, min_n=2)
     log_stage(
         "t3.grid_cells",
@@ -248,7 +238,6 @@ def main() -> None:
         pct_of_brazil_cells=round(100.0 * n_cells_ge2 / BRAZIL_CELLS_REF, 2),
     )
 
-    # -- validate against the frozen contract, then write --------------------
     df = df.select(list(STATIONS_V1)).sort("station_id")
     validate(df, STATIONS_V1, "STATIONS_V1")
     require_non_null(df, ["station_id", "network", "native_id", "status", "ingest_version"],

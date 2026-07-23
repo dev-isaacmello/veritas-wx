@@ -18,7 +18,6 @@ selected ranges.
 import json
 from dataclasses import dataclass
 
-# Fields needed in Phase 1, per source convention
 GFS_WANTED: frozenset[tuple[str, str]] = frozenset(
     {
         ("TMP", "2 m above ground"),
@@ -38,7 +37,7 @@ class IdxEntry:
     level: str
     start: int
     stop: int | None
-    meta: str  # remaining descriptor (e.g. "6 hour fcst" / raw json)
+    meta: str
 
 
 def http_range(entry: IdxEntry) -> str:

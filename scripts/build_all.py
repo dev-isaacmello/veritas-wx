@@ -68,7 +68,6 @@ def stage_figures(cfg: dict) -> None:
     _run("make_figures.py", "--fact", *[str(p) for p in facts])
 
 
-# name -> callable(config) — ORDER IS THE PIPELINE
 STAGES: dict[str, object] = {
     "obs": stage_obs,
     "qc": stage_qc,

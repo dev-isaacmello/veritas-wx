@@ -35,7 +35,6 @@ def run(args: argparse.Namespace) -> None:
     obs_qc = pl.read_parquet(OBS_QC)
     v1 = pl.read_parquet(args.stations)
 
-    # Floor from ALL stations with clean obs (v0 included set), never v1-only.
     all_stations = pl.read_parquet(STATIONS_V0).filter(pl.col("status") == "included")
     clean_obs = obs_qc.filter(pl.col("qc_flags") == 0)
     floors = repr_floor_by_cell(clean_obs, all_stations)

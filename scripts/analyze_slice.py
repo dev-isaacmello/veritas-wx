@@ -26,7 +26,7 @@ from veritas_wx.analyze.metrics.core import bias, mae, rmse, variance_ratio  # n
 from veritas_wx.runlog import log_stage  # noqa: E402
 
 REPORT_PATH = REPO_ROOT / "docs/m5_slice_report.md"
-SEED = 20260723  # fixed: the slice report is reproducible bit-for-bit
+SEED = 20260723
 REPORT_LEADS = [24, 72, 120, 240]
 
 

@@ -33,11 +33,10 @@ def test_gfs_fetch_and_decode_smoke(client):
     assert len(selected) == 4
     fields = decode_messages(blob)
     names = {f.short_name for f in fields}
-    # eccodes normalizes NCEP names; record what we actually get
     assert len(fields) == 4, f"expected 4 fields, got {names}"
     t2 = next(f for f in fields if f.short_name in ("2t", "t"))
     assert 200.0 < float(np.nanmean(t2.values)) < 330.0
-    assert t2.values.shape == (721, 1440)  # global 0.25°
+    assert t2.values.shape == (721, 1440)
 
 
 def test_ecmwf_hres_fetch_and_decode_smoke(client):

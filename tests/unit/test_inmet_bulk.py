@@ -32,9 +32,9 @@ def make_csv(native_id: str = "A001", header: str = HEADER, data_lines: list[str
     ]
     if data_lines is None:
         data_lines = [
-            "2026/01/01;0000 UTC;0;;19,9;1,1;",  # all 3 present
-            "2026/01/01;0100 UTC;,8;;-9999;;",  # precip ,8=0.8; t2m sentinel; wind empty
-            "garbage;;;;;;",  # bad timestamp
+            "2026/01/01;0000 UTC;0;;19,9;1,1;",
+            "2026/01/01;0100 UTC;,8;;-9999;;",
+            "garbage;;;;;;",
         ]
     return "\n".join(meta + [header] + data_lines) + "\n"
 
@@ -49,7 +49,7 @@ class TestParseStationCsv:
         first_hour = df.filter(df["valid_time"] == dt.datetime(2026, 1, 1, tzinfo=dt.UTC))
         by_var = {r["variable"]: r for r in first_hour.to_dicts()}
         assert by_var["precip_1h"]["value"] == 0.0
-        assert by_var["t2m"]["value"] == pytest.approx(293.05)  # 19.9 C -> K
+        assert by_var["t2m"]["value"] == pytest.approx(293.05)
         assert by_var["wind10m"]["value"] == pytest.approx(1.1)
         assert by_var["t2m"]["station_id"] == "inmet:A001"
         assert by_var["t2m"]["source"] == "inmet"
@@ -72,7 +72,7 @@ class TestParseStationCsv:
     def test_sentinel_and_empty_both_missing(self):
         _, df, dropped, _ = parse_station_csv(make_csv(), "test-0")
         h1 = df.filter(df["valid_time"] == dt.datetime(2026, 1, 1, 1, tzinfo=dt.UTC))
-        assert set(h1["variable"]) == {"precip_1h"}  # t2m/-9999 and wind/empty dropped
+        assert set(h1["variable"]) == {"precip_1h"}
         assert dropped["value_missing"] == 2
 
     def test_unparseable_value_counted(self):
@@ -132,6 +132,6 @@ class TestRowsFromZip:
     def test_zip_reconciliation(self, tmp_path):
         """Line count is independent of emission — the identity is not circular."""
         df, total, _, n_lines = rows_from_zip(self.make_zip(tmp_path), "test-0")
-        assert n_lines == 2 * 3  # 2 stations x 3 data lines
+        assert n_lines == 2 * 3
         row_drops = {k: v for k, v in total.items() if k != "skipped_station_files"}
         log_stage("test_inmet_bulk_zip", rows_in=n_lines * 3, rows_out=df.height, dropped=row_drops)

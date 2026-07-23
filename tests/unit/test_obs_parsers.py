@@ -16,14 +16,13 @@ from veritas_wx.ingest.observations.isd import rows_from_isd_lite
 UTC = dt.UTC
 
 
-# ---------------------------------------------------------------- INMET
 
 def test_inmet_payload_golden():
     payload = [
         {
             "DT_MEDICAO": "2025-08-01",
             "HR_MEDICAO": "1400",
-            "TEM_INS": "25.0",  # 25.0 C -> 298.15 K by hand
+            "TEM_INS": "25.0",
             "VEN_VEL": "3.2",
             "CHUVA": "1.4",
         }
@@ -46,9 +45,9 @@ def test_inmet_missing_value_is_dropped_and_counted_never_zeroed():
          "TEM_INS": "20.0", "VEN_VEL": None, "CHUVA": ""},
     ]
     df, dropped = rows_from_payload(payload, "inmet:A001", "test")
-    assert df.height == 1  # only t2m
+    assert df.height == 1
     assert dropped["value_missing"] == 2
-    assert 0.0 not in df["value"].to_list()  # missing NEVER becomes zero
+    assert 0.0 not in df["value"].to_list()
 
 
 def test_inmet_bad_timestamp_drops_whole_record():
@@ -69,7 +68,6 @@ def test_inmet_reconciliation_identity():
     assert len(payload) * len(VAR_MAP) == df.height + sum(dropped.values())
 
 
-# ---------------------------------------------------------------- ISD-Lite
 
 ISD_SAMPLE = """\
 2025 07 01 12  215  180 10132 250   31  8   -1 -9999
@@ -83,7 +81,6 @@ def test_isd_lite_golden():
 
     h12 = {r["variable"]: r for r in df.filter(
         pl.col("valid_time") == dt.datetime(2025, 7, 1, 12, tzinfo=UTC)).to_dicts()}
-    # 215 -> 21.5 C -> 294.65 K by hand; 31 -> 3.1 m/s; -1 = trace -> 0.0 mm flagged 'T'
     assert h12["t2m"]["value"] == pytest.approx(294.65)
     assert h12["wind10m"]["value"] == pytest.approx(3.1)
     assert h12["precip_1h"]["value"] == 0.0
@@ -91,15 +88,15 @@ def test_isd_lite_golden():
 
     h13 = {r["variable"]: r for r in df.filter(
         pl.col("valid_time") == dt.datetime(2025, 7, 1, 13, tzinfo=UTC)).to_dicts()}
-    assert "t2m" not in h13  # -9999 -> missing, no row
-    assert h13["precip_1h"]["value"] == pytest.approx(0.5)  # 5 -> 0.5 mm
-    assert dropped["value_missing"] == 1  # exactly the missing t2m
+    assert "t2m" not in h13
+    assert h13["precip_1h"]["value"] == pytest.approx(0.5)
+    assert dropped["value_missing"] == 1
 
 
 def test_isd_lite_reconciliation_identity():
     text = ISD_SAMPLE + "garbage line\n"
     df, dropped = rows_from_isd_lite(text, "isd:X", "test")
-    parsed_lines = 3  # 2 valid + 1 malformed
+    parsed_lines = 3
     assert parsed_lines * 3 == df.height + sum(dropped.values())
 
 

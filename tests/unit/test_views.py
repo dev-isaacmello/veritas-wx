@@ -39,11 +39,11 @@ def test_only_fully_matched_keys_survive():
     rows = []
     for st in ["inmet:A", "inmet:B", "inmet:C"]:
         rows.append({"model": "aifs", "station_id": st})
-        if st != "inmet:C":  # gfs missing station C
+        if st != "inmet:C":
             rows.append({"model": "gfs", "station_id": st})
     view, manifest = matched_view(_fact(rows), ["aifs", "gfs"])
     assert manifest["n_matched_keys"] == 2
-    assert view.height == 4  # 2 keys x 2 models
+    assert view.height == 4
     assert "inmet:C" not in view["station_id"].to_list()
 
 
@@ -55,9 +55,8 @@ def test_flagged_pair_breaks_the_match_under_strict_qc():
         {"model": "gfs", "station_id": "inmet:B"},
     ]
     strict, m_strict = matched_view(_fact(rows), ["aifs", "gfs"])
-    assert m_strict["n_matched_keys"] == 1  # station A's key dies entirely
+    assert m_strict["n_matched_keys"] == 1
 
-    # consumer relaxes rigor: mask only requires DUPLICATE clear -> A returns
     relaxed, m_relaxed = matched_view(_fact(rows), ["aifs", "gfs"], qc_mask=qc_bits.DUPLICATE)
     assert m_relaxed["n_matched_keys"] == 2
     assert m_relaxed["qc_mask"] == qc_bits.DUPLICATE

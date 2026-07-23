@@ -26,7 +26,7 @@ def _public_functions() -> dict[str, object]:
     fns = {}
     for name, obj in inspect.getmembers(core, inspect.isfunction):
         if obj.__module__ != core.__name__:
-            continue  # imported helpers are not this module's API
+            continue
         if name.startswith("_") or name.endswith("_stat"):
             continue
         fns[name] = obj

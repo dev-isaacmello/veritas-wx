@@ -39,7 +39,7 @@ def main() -> None:
     if len(models) >= 2:
         comparisons.extend([list(p) for p in itertools.combinations(models, 2)])
     if len(models) > 2:
-        comparisons.append(models)  # the all-models view
+        comparisons.append(models)
 
     if not comparisons:
         raise SystemExit(f"fact has {models} — need >= 2 models for any view")

@@ -66,7 +66,7 @@ def load_params() -> dict:
 def window_hours() -> int:
     cfg = yaml.safe_load((REPO_ROOT / "configs/ingest.yaml").read_text())
     start = date.fromisoformat(cfg["window"]["start"])
-    end = date.fromisoformat(cfg["window"]["end"])  # inclusive
+    end = date.fromisoformat(cfg["window"]["end"])
     return int(((end - start).days + 1) * 24)
 
 
@@ -80,7 +80,6 @@ def build_neighbor_pairs(stations: pl.DataFrame, k: int, radius_km: float) -> pl
     ids = inc["station_id"].to_list()
     lat = np.radians(inc["lat"].to_numpy())
     lon = np.radians(inc["lon"].to_numpy())
-    # haversine, vectorized full matrix
     dlat = lat[:, None] - lat[None, :]
     dlon = lon[:, None] - lon[None, :]
     a = np.sin(dlat / 2) ** 2 + np.cos(lat[:, None]) * np.cos(lat[None, :]) * np.sin(dlon / 2) ** 2
@@ -97,7 +96,6 @@ def build_neighbor_pairs(stations: pl.DataFrame, k: int, radius_km: float) -> pl
         {"station_id": [p[0] for p in pairs], "neighbor_id": [p[1] for p in pairs]},
         schema={"station_id": pl.Utf8, "neighbor_id": pl.Utf8},
     )
-    # spot-check the vectorization against the scalar haversine (guard, not test)
     if pairs:
         s0, n0 = pairs[0]
         r0 = inc.filter(pl.col("station_id") == s0).row(0, named=True)
@@ -217,7 +215,6 @@ def run(args: argparse.Namespace) -> None:
     tmp.replace(OBS_QC_OUT)
     print(f"wrote {OBS_QC_OUT} sha256={sha256_of(OBS_QC_OUT)}", file=sys.stderr)
 
-    # per-check x variable flag rates (calibration evidence for ADR-0003)
     from veritas_wx.contracts import qc_bits
 
     rates = obs_qc.group_by("variable").agg(

@@ -53,7 +53,6 @@ def benjamini_hochberg(p: np.ndarray, q: float = 0.05) -> tuple[np.ndarray, np.n
     order = np.argsort(p, kind="stable")
     ranks = np.arange(1, n + 1, dtype=np.float64)
     stepup = p[order] * n / ranks
-    # Step-up monotonicity: cumulative minimum from the largest rank down.
     adj_sorted = np.minimum.accumulate(stepup[::-1])[::-1]
     adj_sorted = np.minimum(adj_sorted, 1.0)
 

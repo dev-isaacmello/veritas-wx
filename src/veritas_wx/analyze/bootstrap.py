@@ -24,8 +24,6 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 
-#: Clamp for the resolved block length, in days — mirrors
-#: metrics_registry.yaml ``defaults.block_length.clamp_days``.
 REGISTRY_BLOCK_CLAMP_DAYS: tuple[int, int] = (2, 30)
 
 
@@ -115,11 +113,11 @@ def optimal_block_length(x: np.ndarray) -> float:
     centered = x - x.mean()
     r0 = float(centered @ centered) / n
     if r0 <= 0.0 or not np.isfinite(r0):
-        return 1.0  # constant (or pathological) series
+        return 1.0
 
     k_n = max(5, math.ceil(math.sqrt(math.log10(n))))
     m_max = math.ceil(math.sqrt(n)) + k_n
-    lag_cap = n - 1  # R(k) only estimable for k <= n-1
+    lag_cap = n - 1
     acv_lags = min(2 * m_max, lag_cap)
 
     acv = np.empty(acv_lags + 1)
@@ -139,7 +137,7 @@ def optimal_block_length(x: np.ndarray) -> float:
 
     big_m = min(2 * m_hat, lag_cap)
     if big_m == 0:
-        return 1.0  # iid-like: no significant dependence detected
+        return 1.0
 
     lags = np.arange(1, big_m + 1)
     t = lags / big_m

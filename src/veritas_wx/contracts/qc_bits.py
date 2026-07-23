@@ -6,12 +6,12 @@ Bits 6–15 are reserved for future checks; changing existing values is a
 breaking change and requires a new contract version.
 """
 
-RANGE = 1  # value outside physical plausibility for location/season
-STEP = 2  # implausible change between consecutive readings
-PERSISTENCE = 4  # identical value repeated beyond threshold (stuck sensor)
-SPATIAL = 8  # excessive deviation vs neighboring stations
-METADATA = 16  # suspicious/missing elevation or coordinates
-DUPLICATE = 32  # redundant record across sources
+RANGE = 1
+STEP = 2
+PERSISTENCE = 4
+SPATIAL = 8
+METADATA = 16
+DUPLICATE = 32
 
 ALL_BITS: dict[str, int] = {
     "RANGE": RANGE,

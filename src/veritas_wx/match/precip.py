@@ -48,7 +48,6 @@ def precip_24h(
     if convention is AccumConvention.FROM_INIT:
         end = series_mm.get(lead_hours)
         start = 0.0 if lead_hours == 24 else series_mm.get(lead_hours - 24)
-        # lead == 24 uses accumulation-since-init directly (start of window is init)
         if lead_hours == 24:
             return end
         if end is None or start is None:

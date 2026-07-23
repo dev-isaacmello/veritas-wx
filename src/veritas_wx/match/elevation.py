@@ -5,7 +5,7 @@ together with delta_z. Pairs with |delta_z| > max_delta_z (default 500 m,
 configs/ingest.yaml) are dropped by the fact builder — counted, never silent.
 """
 
-LAPSE_RATE_K_PER_M = 0.0065  # standard atmosphere, 6.5 K/km (Phase 1: fixed)
+LAPSE_RATE_K_PER_M = 0.0065
 
 
 def delta_z(elev_station: float, elev_cell: float) -> float:

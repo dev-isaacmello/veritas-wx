@@ -18,9 +18,7 @@ def test_oni_center_month_mapping_by_hand():
     df, dropped = parse_oni(ONI_FIXTURE)
     assert df.height == 3 and dropped["malformed_line"] == 0
     rows = {(r["year"], r["month"]): r["oni"] for r in df.to_dicts()}
-    # DJF 1950 -> centered January 1950
     assert rows[(1950, 1)] == pytest.approx(-1.53)
-    # NDJ 2023 -> centered December 2023 (El Niño 2023-24 peak)
     assert rows[(2023, 12)] == pytest.approx(1.95)
 
 
@@ -42,7 +40,7 @@ year month day RMM1 RMM2 phase amplitude. Missing Value= 1.E36
 def test_rmm_parse_golden():
     df, dropped = parse_rmm(RMM_FIXTURE)
     assert df.height == 3
-    assert dropped["missing_value"] == 1  # the 1.E36 line
+    assert dropped["missing_value"] == 1
     first = df.to_dicts()[0]
     assert first["date"] == dt.date(1974, 6, 1)
     assert first["phase"] == 5

@@ -68,7 +68,7 @@ def preflight_data_root() -> None:
 def load_window() -> tuple[datetime, datetime]:
     cfg = yaml.safe_load((REPO_ROOT / "configs/ingest.yaml").read_text())
     start = date.fromisoformat(cfg["window"]["start"])
-    end = date.fromisoformat(cfg["window"]["end"])  # inclusive
+    end = date.fromisoformat(cfg["window"]["end"])
     return (
         datetime(start.year, start.month, start.day, tzinfo=UTC),
         datetime(end.year, end.month, end.day, tzinfo=UTC) + timedelta(days=1),
@@ -112,7 +112,6 @@ def run(years: list[int]) -> None:
 
     obs = pl.concat(frames)
 
-    # Window clip: the 2025 zip carries Jan-Jun/2025 (pre-window) — count, never silent.
     in_window = obs.filter(
         (pl.col("valid_time") >= window_start) & (pl.col("valid_time") < window_end)
     )
@@ -127,8 +126,6 @@ def run(years: list[int]) -> None:
         ],
     )
 
-    # Bulk zips may repeat an hour across builds; identical duplicates collapse,
-    # conflicting ones must not pass silently.
     key = ["station_id", "valid_time", "variable"]
     deduped = in_window.unique(subset=[*key, "value"], keep="first")
     conflicts = deduped.filter(deduped.select(key).is_duplicated())

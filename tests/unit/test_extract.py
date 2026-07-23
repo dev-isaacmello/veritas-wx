@@ -41,7 +41,7 @@ def _make_message(short_name: str, values: np.ndarray) -> bytes:
         eccodes.codes_release(h)
 
 
-VALUES = np.arange(12, dtype=float).reshape(3, 4)  # row 0 == lat 2.0 (north)
+VALUES = np.arange(12, dtype=float).reshape(3, 4)
 
 
 def test_decode_roundtrip_grid_and_values():
@@ -50,7 +50,7 @@ def test_decode_roundtrip_grid_and_values():
     f = fields[0]
     assert f.values.shape == (3, 4)
     np.testing.assert_allclose(f.lons, [0.0, 1.0, 2.0, 3.0])
-    assert f.lats[0] > f.lats[-1]  # grid order preserved (descending)
+    assert f.lats[0] > f.lats[-1]
     np.testing.assert_allclose(f.values, VALUES)
 
 
@@ -79,7 +79,6 @@ def _stations() -> pl.DataFrame:
 
 
 def test_instantaneous_points_wind_speed_at_nodes_before_interp():
-    # u = 3 everywhere, v = 4 everywhere -> speed 5 at every node -> bilinear 5
     fields = by_short_name(
         [
             _fake("2t", np.full((3, 4), 290.0)),
@@ -93,7 +92,7 @@ def test_instantaneous_points_wind_speed_at_nodes_before_interp():
     assert by_var["wind10m"]["value"] == pytest.approx(5.0)
     assert by_var["t2m"]["valid_time"] == INIT + dt.timedelta(hours=6)
     assert by_var["t2m"]["grid_lat"] == pytest.approx(1.0)
-    assert by_var["t2m"]["grid_elev"] is None  # no orography passed -> NULL
+    assert by_var["t2m"]["grid_elev"] is None
 
 
 def test_tp_units_meters_converted_kgm2_passthrough():
@@ -108,7 +107,6 @@ def test_tp_units_meters_converted_kgm2_passthrough():
 def test_tp_nearest_per_station():
     tp = _fake("tp", VALUES, units="kg m**-2")
     out = tp_nearest({"tp": tp}, _stations())
-    # station at (1.0, 1.0): lat row 1, lon col 1 -> VALUES[1, 1] = 5.0
     assert out["inmet:A"] == pytest.approx(5.0)
 
 

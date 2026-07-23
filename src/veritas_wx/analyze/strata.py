@@ -7,10 +7,8 @@ concern of the caller's runlog) and never imputed.
 
 import polars as pl
 
-#: ENSO threshold on the ONI, degrees C (registry: ``strata.enso``, +/- 0.5).
 ONI_THRESHOLD = 0.5
 
-#: Minimum RMM amplitude for an active MJO phase (registry: ``strata.mjo_phase``).
 MJO_MIN_AMPLITUDE = 1.0
 
 

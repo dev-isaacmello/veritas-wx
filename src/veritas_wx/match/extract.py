@@ -24,11 +24,11 @@ from veritas_wx.match import interp
 @dataclass(frozen=True)
 class DecodedField:
     short_name: str
-    lats: np.ndarray  # 1D, grid order (may be descending)
-    lons: np.ndarray  # 1D
-    values: np.ndarray  # 2D [lat_idx, lon_idx]
+    lats: np.ndarray
+    lons: np.ndarray
+    values: np.ndarray
     units: str
-    step: str  # eccodes stepRange ("6", "0-6", ...)
+    step: str
 
 
 def decode_messages(grib_bytes: bytes) -> list[DecodedField]:

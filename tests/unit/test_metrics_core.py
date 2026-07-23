@@ -27,9 +27,6 @@ def _days(n: int, start: date = date(2025, 7, 1)) -> list[date]:
     return [start + timedelta(days=i) for i in range(n)]
 
 
-# ---------------------------------------------------------------------------
-# Scalar statistics: three known pairs
-# ---------------------------------------------------------------------------
 @pytest.fixture()
 def three_pairs() -> pl.DataFrame:
     """fcst - obs = [-1, 0, 2]  =>  mae = 1, bias = 1/3, rmse = sqrt(5/3)."""
@@ -55,9 +52,6 @@ def test_rmse_stat_golden(three_pairs):
     assert rmse_stat(three_pairs) == pytest.approx(np.sqrt((1 + 0 + 4) / 3))
 
 
-# ---------------------------------------------------------------------------
-# variance_ratio: constructed 2 stations x 40 days with exact ratio 0.5
-# ---------------------------------------------------------------------------
 def _shrunk_frame() -> pl.DataFrame:
     """Per station: fcst = mean(obs) + 0.5*(obs - mean(obs)) => std ratio 0.5."""
     days = _days(40)
@@ -114,9 +108,6 @@ def test_variance_ratio_all_excluded_is_nan():
     assert np.isnan(variance_ratio_stat(df))
 
 
-# ---------------------------------------------------------------------------
-# Public wrappers: always a BootstrapResult, estimate == stat on the full df
-# ---------------------------------------------------------------------------
 def test_public_wrappers_return_bootstrap_result(three_pairs):
     for fn, stat in ((mae, mae_stat), (rmse, rmse_stat), (bias, bias_stat)):
         res = fn(three_pairs, rng=np.random.default_rng(0), n_boot=50, block_len=2)
@@ -131,14 +122,10 @@ def test_variance_ratio_public_wrapper():
     res = variance_ratio(df, rng=np.random.default_rng(1), n_boot=50, block_len=5)
     assert isinstance(res, BootstrapResult)
     assert res.estimate == pytest.approx(0.5)
-    # the construction is exact per station in EVERY resample => degenerate CI at 0.5
     assert res.ci_low == pytest.approx(0.5)
     assert res.ci_high == pytest.approx(0.5)
 
 
-# ---------------------------------------------------------------------------
-# bias_by_percentile with fabricated obs_pct
-# ---------------------------------------------------------------------------
 def test_bias_by_percentile_golden():
     """20 pairs at obs_pct=5 with error +1; 20 at obs_pct=99.5 with error -1."""
     days = _days(20)
@@ -147,7 +134,7 @@ def test_bias_by_percentile_golden():
             "station_id": ["s"] * 20,
             "day": days,
             "obs": [10.0] * 20,
-            "fcst": [11.0] * 20,  # error +1
+            "fcst": [11.0] * 20,
             "obs_pct": [5.0] * 20,
         }
     )
@@ -156,7 +143,7 @@ def test_bias_by_percentile_golden():
             "station_id": ["s"] * 20,
             "day": days,
             "obs": [30.0] * 20,
-            "fcst": [29.0] * 20,  # error -1
+            "fcst": [29.0] * 20,
             "obs_pct": [99.5] * 20,
         }
     )
@@ -164,12 +151,12 @@ def test_bias_by_percentile_golden():
     out = bias_by_percentile(df, rng=np.random.default_rng(2), n_boot=50, block_len=3)
 
     assert out.columns == ["bin", "estimate", "ci_low", "ci_high", "n_pairs"]
-    assert out["bin"].to_list() == list(REGISTRY_BINS)  # one row per registry bin, in order
+    assert out["bin"].to_list() == list(REGISTRY_BINS)
 
     row_low = out.filter(pl.col("bin") == "0-10")
     assert row_low["estimate"].item() == pytest.approx(1.0)
     assert row_low["n_pairs"].item() == 20
-    assert row_low["ci_low"].item() == pytest.approx(1.0)  # constant error => degenerate CI
+    assert row_low["ci_low"].item() == pytest.approx(1.0)
 
     row_high = out.filter(pl.col("bin") == "99-100")
     assert row_high["estimate"].item() == pytest.approx(-1.0)
@@ -196,7 +183,7 @@ def test_bias_by_percentile_top_bin_inclusive_and_boundaries():
     assert out.filter(pl.col("bin") == "99-100")["n_pairs"].item() == 5
     assert out.filter(pl.col("bin") == "10-20")["n_pairs"].item() == 5
     assert out.filter(pl.col("bin") == "0-10")["n_pairs"].item() == 0
-    assert out["n_pairs"].sum() == 10  # bins partition the pairs
+    assert out["n_pairs"].sum() == 10
 
 
 def test_bias_by_percentile_requires_obs_pct(three_pairs):
@@ -204,10 +191,6 @@ def test_bias_by_percentile_requires_obs_pct(three_pairs):
         bias_by_percentile(three_pairs, rng=np.random.default_rng(0))
 
 
-# ---------------------------------------------------------------------------
-# Representativeness decomposition (registered metrics mse_total /
-# repr_floor_mean / mse_model_est — tested here; no separate test file)
-# ---------------------------------------------------------------------------
 def test_decomposition_golden_constant_frame():
     """Constant error 1 and constant floor 0.25 => exact, degenerate-CI rows."""
     n = 30
@@ -216,7 +199,7 @@ def test_decomposition_golden_constant_frame():
             "station_id": ["s"] * n,
             "day": _days(n),
             "obs": [10.0] * n,
-            "fcst": [11.0] * n,  # squared error 1.0 everywhere
+            "fcst": [11.0] * n,
             "repr_floor": [0.25] * n,
         }
     )
@@ -233,7 +216,7 @@ def test_decomposition_golden_constant_frame():
         assert row["n_pairs"] == n and row["n_days"] == n
         assert row["n_boot"] == 50 and row["block_len_days"] == 5
     assert by["mse_total"]["clipped_frac"] is None
-    assert by["mse_model_est"]["clipped_frac"] == pytest.approx(0.0)  # clip never acts
+    assert by["mse_model_est"]["clipped_frac"] == pytest.approx(0.0)
 
 
 def test_decomposition_uses_only_pairs_with_repr_floor():
@@ -243,7 +226,6 @@ def test_decomposition_uses_only_pairs_with_repr_floor():
             "station_id": ["s"] * 20,
             "day": _days(20),
             "obs": [0.0] * 20,
-            # eligible half has error 1; ineligible half error 100 — must not leak in
             "fcst": [1.0] * 10 + [100.0] * 10,
             "repr_floor": [0.5] * 10 + [None] * 10,
         }
@@ -264,8 +246,8 @@ def test_decomposition_clip_acts_and_is_flagged():
             "station_id": ["s"] * n,
             "day": _days(n),
             "obs": [10.0] * n,
-            "fcst": [10.5] * n,  # squared error 0.25
-            "repr_floor": [2.0] * n,  # floor far above total
+            "fcst": [10.5] * n,
+            "repr_floor": [2.0] * n,
         }
     )
     out = representativeness_decomposition(
@@ -274,7 +256,7 @@ def test_decomposition_clip_acts_and_is_flagged():
     by = {r["metric"]: r for r in out.to_dicts()}
     assert by["mse_model_est"]["estimate"] == 0.0
     assert by["mse_model_est"]["clipped_frac"] == pytest.approx(1.0)
-    assert by["mse_model_est"]["ci_low"] >= 0.0  # draws are clipped too
+    assert by["mse_model_est"]["ci_low"] >= 0.0
 
 
 def test_decomposition_zero_eligible_pairs_returns_empty_with_schema():
@@ -288,7 +270,7 @@ def test_decomposition_zero_eligible_pairs_returns_empty_with_schema():
         }
     )
     out = representativeness_decomposition(df, rng=np.random.default_rng(3), n_boot=10)
-    assert out.height == 0  # never invented
+    assert out.height == 0
     assert out.columns == [
         "metric",
         "estimate",

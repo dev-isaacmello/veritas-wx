@@ -21,7 +21,7 @@ MANIFEST_SCHEMA: dict[str, pl.DataType] = {
     "model": pl.Utf8,
     "init_time": pl.Datetime(time_unit="us", time_zone="UTC"),
     "downloaded_at": pl.Datetime(time_unit="us", time_zone="UTC"),
-    "status": pl.Utf8,  # fetched | verified | pruned
+    "status": pl.Utf8,
 }
 
 

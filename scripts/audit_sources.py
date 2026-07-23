@@ -36,20 +36,18 @@ import polars as pl
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "docs" / "data_audit.md"
 
-# ---------------------------------------------------------------- window / config
 WINDOW_START = date(2025, 7, 1)
 WINDOW_END = date(2026, 6, 30)
-LEADS = list(range(6, 241, 6))  # 40 leads, 6..240 h step 6 (configs/ingest.yaml)
+LEADS = list(range(6, 241, 6))
 RUNS = (0, 12)
 RUNS_PER_DAY = len(RUNS)
-DISK_BUDGET_GB = 767  # PLAN.md R1/D8 — free space on the 1 TB data HD
+DISK_BUDGET_GB = 767
 
 GFS_BUCKET = "noaa-gfs-bdp-pds"
 ECMWF_BUCKET = "ecmwf-forecasts"
 MLWP_BUCKET = "noaa-oar-mlwp-data"
 DEM_BUCKET = "copernicus-dem-30m"
 
-# GFS .idx level strings -> canonical field names
 GFS_FIELDS = {
     "TMP:2 m above ground": "t2m",
     "UGRD:10 m above ground": "u10",
@@ -59,32 +57,30 @@ GFS_FIELDS = {
 GFS_OROG_FIELD = "HGT:surface"
 ECMWF_PARAMS = ("2t", "10u", "10v", "tp")
 GRAPHCAST_PREFIX = "GRAP_v100_GFS"
-# GraphCast fields per README.txt: 5 surface (10u,10v,2t,msl,tp6h) + 6 pl vars x 13 levels
 GRAPHCAST_N_FIELDS_TOTAL = 5 + 6 * 13
-GRAPHCAST_N_FIELDS_NEEDED = 4  # 2t, 10u, 10v, tp6h
-GRAPHCAST_GRID = (41, 721, 1440)  # timesteps f000..f240/6h, lat, lon
+GRAPHCAST_N_FIELDS_NEEDED = 4
+GRAPHCAST_GRID = (41, 721, 1440)
 
 INMET_API = "https://apitempo.inmet.gov.br"
-INMET_SAMPLE = ("2025-08-01", "2025-08-31", "A001")  # one station-month, hourly
+INMET_SAMPLE = ("2025-08-01", "2025-08-31", "A001")
 INMET_BULK = "https://portal.inmet.gov.br/uploads/dadoshistoricos/{year}.zip"
 BDMEP_URL = "https://bdmep.inmet.gov.br/"
 ISD_HISTORY = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
 ISD_LITE = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/{year}/{usaf}-{wban}-{year}.gz"
 GLOBAL_HOURLY = "https://www.ncei.noaa.gov/data/global-hourly/access/{year}/{usaf}{wban}.csv"
-ISD_SAMPLE_STATION = ("833780", "99999")  # Brasilia (SBBR area), deterministic sample
+ISD_SAMPLE_STATION = ("833780", "99999")
 ONI_URL = "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
 MJO_URL = "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
 MJO_FALLBACK_PSL_OMI = "https://psl.noaa.gov/mjo/mjoindex/omi.1x.txt"
 MJO_FALLBACK_IRI_RMM = "https://iridl.ldeo.columbia.edu/SOURCES/.BoM/.MJO/.RMM/"
-KOPPEN_FIGSHARE_ARTICLE = "https://api.figshare.com/v2/articles/21789074"  # Beck et al. 2023
+KOPPEN_FIGSHARE_ARTICLE = "https://api.figshare.com/v2/articles/21789074"
 KOPPEN_GLOH2O = "https://www.gloh2o.org/koppen/"
-DEM_SAMPLE_TILE = "Copernicus_DSM_COG_10_S16_00_W048_00_DEM"  # Brasilia tile
+DEM_SAMPLE_TILE = "Copernicus_DSM_COG_10_S16_00_W048_00_DEM"
 
 BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
 
 
-# ---------------------------------------------------------------- HTTP plumbing
 class Prober:
     """httpx wrapper: retries, request counting, byte accounting."""
 
@@ -152,7 +148,6 @@ class Prober:
         return keys, prefixes
 
 
-# ---------------------------------------------------------------- date helpers
 def window_months() -> list[tuple[int, int]]:
     months, d = [], WINDOW_START
     while d <= WINDOW_END:
@@ -181,7 +176,6 @@ def fmt_mb(n_bytes: float) -> str:
     return f"{n_bytes / 1e6:,.1f}"
 
 
-# ---------------------------------------------------------------- GFS
 def gfs_probe_day_run(p: Prober, day: date, run: int) -> dict[str, Any]:
     ymd = day.strftime("%Y%m%d")
     stem = f"gfs.{ymd}/{run:02d}/atmos/gfs.t{run:02d}z.pgrb2.0p25.f"
@@ -210,7 +204,6 @@ def gfs_parse_idx(text: str, file_size: int, lead: int) -> dict[str, int]:
         if key in GFS_FIELDS:
             name = GFS_FIELDS[key]
             if name == "apcp_6h":
-                # GFS pgrb2 carries two APCP records; keep the 6-h bucket
                 if rng == f"{lead - 6}-{lead} hour acc fcst" or name not in sizes:
                     sizes[name] = length
             else:
@@ -221,7 +214,6 @@ def gfs_parse_idx(text: str, file_size: int, lead: int) -> dict[str, int]:
 
 
 def audit_gfs(p: Prober, months: list[tuple[int, int]], pool: ThreadPoolExecutor) -> dict:
-    # breadth: every gfs.YYYYMMDD date prefix in the bucket (back to the oldest)
     _, prefixes = p.s3_list(GFS_BUCKET, "gfs.", "/", max_pages=5)
     dates = sorted(m.group(1) for pre in prefixes if (m := re.match(r"gfs\.(\d{8})/$", pre)))
     have = set(dates)
@@ -231,10 +223,8 @@ def audit_gfs(p: Prober, months: list[tuple[int, int]], pool: ThreadPoolExecutor
         for d in days_of_month(y, mo)
         if d.strftime("%Y%m%d") not in have
     ]
-    # depth: sampled day-runs, all leads + .idx
     tasks = [(d, r) for d in sample_days(months) for r in RUNS]
     probes = list(pool.map(lambda t: gfs_probe_day_run(p, *t), tasks))
-    # bytes per run from the representative run (window start, 00Z)
     ymd = WINDOW_START.strftime("%Y%m%d")
     stem = f"gfs.{ymd}/00/atmos/gfs.t00z.pgrb2.0p25.f"
     keys, _ = p.s3_list(GFS_BUCKET, stem)
@@ -267,7 +257,6 @@ def audit_gfs(p: Prober, months: list[tuple[int, int]], pool: ThreadPoolExecutor
     }
 
 
-# ---------------------------------------------------------------- ECMWF (HRES + AIFS)
 def ecmwf_probe_day_run(p: Prober, product: str, day: date, run: int) -> dict[str, Any]:
     ymd = day.strftime("%Y%m%d")
     prefix = f"{ymd}/{run:02d}z/{product}/"
@@ -313,7 +302,6 @@ def audit_ecmwf_product(
     ]
     tasks = [(d, r) for d in sample_days(months) for r in RUNS]
     probes = list(pool.map(lambda t: ecmwf_probe_day_run(p, product, *t), tasks))
-    # bytes per run via .index JSON-lines (representative run: window start 00Z)
     ymd = WINDOW_START.strftime("%Y%m%d")
 
     def one_index(lead: int) -> dict[str, int]:
@@ -335,7 +323,6 @@ def audit_ecmwf_product(
     for sizes in per_lead:
         for k, v in sizes.items():
             field_totals[k] = field_totals.get(k, 0) + v
-    # orography availability at step 0 (sfc params present in the 0h index)
     url0 = f"https://{ECMWF_BUCKET}.s3.amazonaws.com/{ymd}/00z/{product}/{ymd}000000-0h-oper-fc.index"
     sfc_params = sorted(
         {
@@ -369,9 +356,7 @@ def audit_aifs_first_date(p: Prober) -> dict:
     }
 
 
-# ---------------------------------------------------------------- GraphCast (AIWP)
 def audit_graphcast(p: Prober, months: list[tuple[int, int]]) -> dict:
-    # full file-level inventory of the window years (1-2 list pages per year)
     inv: dict[tuple[str, int], int] = {}
     for year in sorted({y for y, _ in months}):
         keys, _ = p.s3_list(MLWP_BUCKET, f"{GRAPHCAST_PREFIX}/{year}/")
@@ -391,7 +376,6 @@ def audit_graphcast(p: Prober, months: list[tuple[int, int]]) -> dict:
     w0, w1 = WINDOW_START.strftime("%Y%m%d"), WINDOW_END.strftime("%Y%m%d")
     window_sizes = [s for (d, _), s in inv.items() if w0 <= d <= w1]
     median_size = int(statistics.median(window_sizes)) if window_sizes else 0
-    # oldest folder in the archive
     _, years = p.s3_list(MLWP_BUCKET, f"{GRAPHCAST_PREFIX}/", "/")
     first_year = sorted(years)[0].rstrip("/").split("/")[-1] if years else None
     oldest = None
@@ -400,7 +384,6 @@ def audit_graphcast(p: Prober, months: list[tuple[int, int]]) -> dict:
         if dayfolders:
             mmdd = sorted(dayfolders)[0].rstrip("/").split("/")[-1]
             oldest = f"{first_year}-{mmdd[:2]}-{mmdd[2:]}"
-    # format check: HDF5 magic via range request on the representative file
     ymd = WINDOW_START.strftime("%Y%m%d")
     rep_key = f"{GRAPHCAST_PREFIX}/{ymd[:4]}/{ymd[4:]}/{GRAPHCAST_PREFIX}_{ymd}00_f000_f240_06.nc"
     magic = p.get_range(f"https://{MLWP_BUCKET}.s3.amazonaws.com/{rep_key}", "0-7")
@@ -419,7 +402,6 @@ def audit_graphcast(p: Prober, months: list[tuple[int, int]]) -> dict:
     }
 
 
-# ---------------------------------------------------------------- INMET
 def inmet_attempt(p: Prober, url: str) -> dict[str, Any]:
     t0 = time.time()
     try:
@@ -494,7 +476,6 @@ def audit_inmet(p: Prober) -> dict:
     }
 
 
-# ---------------------------------------------------------------- ISD / NCEI
 def audit_isd(p: Prober) -> dict:
     resp = p.get(ISD_HISTORY)
     inv_last_modified = resp.headers.get("last-modified")
@@ -521,7 +502,6 @@ def audit_isd(p: Prober) -> dict:
             }
         except RuntimeError as exc:
             heads[label] = {"status": None, "error": str(exc)}
-    # last observation actually present in the 2025 global-hourly sample file
     last_obs = None
     if heads.get("global_hourly_2025", {}).get("status") == 200:
         tail = p.get_range(GLOBAL_HOURLY.format(year=2025, usaf=usaf, wban=wban), "-2000")
@@ -541,17 +521,14 @@ def audit_isd(p: Prober) -> dict:
     }
 
 
-# ---------------------------------------------------------------- statics
 def audit_statics(p: Prober) -> dict:
     out: dict[str, Any] = {}
-    # Copernicus DEM: bucket reachable + the Brasilia tile main COG
     keys, _ = p.s3_list(DEM_BUCKET, f"{DEM_SAMPLE_TILE}/{DEM_SAMPLE_TILE}.tif")
     out["dem"] = {
         "reachable": bool(keys),
         "sample_tile": keys[0][0] if keys else None,
         "sample_bytes": keys[0][1] if keys else None,
     }
-    # Koppen Beck et al. 2023 via figshare API
     try:
         art = p.get(KOPPEN_FIGSHARE_ARTICLE).json()
         tif = next((f for f in art.get("files", []) if f["name"] == "koppen_geiger_tif.zip"), None)
@@ -562,7 +539,6 @@ def audit_statics(p: Prober) -> dict:
             "download_url": tif["download_url"] if tif else None,
         }
         if tif:
-            # figshare's downloader rejects HEAD; a 1-byte ranged GET proves availability
             resp = p.get(tif["download_url"], headers={"Range": "bytes=0-0"})
             koppen["probe_status"] = resp.status_code
             cr = resp.headers.get("content-range", "")
@@ -574,13 +550,11 @@ def audit_statics(p: Prober) -> dict:
         out["koppen_gloh2o_status"] = p.get(KOPPEN_GLOH2O).status_code
     except RuntimeError:
         out["koppen_gloh2o_status"] = None
-    # ONI
     try:
         lines = [ln for ln in p.get(ONI_URL).text.splitlines() if ln.strip()]
         out["oni"] = {"status": 200, "first_row": lines[1].split(), "last_row": lines[-1].split()}
     except (RuntimeError, IndexError) as exc:
         out["oni"] = {"error": str(exc)}
-    # MJO RMM (BoM) — needs a browser UA; check the LAST date actually in the file
     try:
         text = p.get(MJO_URL).text
         lines = [ln for ln in text.splitlines() if ln.strip()]
@@ -606,7 +580,6 @@ def audit_statics(p: Prober) -> dict:
     return out
 
 
-# ---------------------------------------------------------------- matrix + verdicts
 def month_cell_model(
     month: tuple[int, int], probes: list[dict], missing_dates: list[str]
 ) -> str:
@@ -625,7 +598,6 @@ def month_cell_model(
 def month_cell_graphcast(info: dict[str, Any]) -> str:
     if info["present"] == info["expected"]:
         return "✓"
-    # month mostly there => parcial; near-absent => ✗
     return "parcial" if info["present"] / info["expected"] >= 0.5 else "✗"
 
 
@@ -651,7 +623,6 @@ def month_cell_inmet(month: tuple[int, int], inmet: dict) -> str:
         lm_date = datetime.strptime(lm, "%a, %d %b %Y %H:%M:%S %Z").date()
     except ValueError:
         return "parcial"
-    # zip published after the month ended => month contained in the yearly bundle
     month_end = days_of_month(*month)[-1]
     return "✓" if lm_date > month_end else "parcial"
 
@@ -680,7 +651,6 @@ def build_matrix(results: dict, months: list[tuple[int, int]]) -> dict[str, list
     return rows
 
 
-# ---------------------------------------------------------------- report (pt-BR)
 def render_report(results: dict, months: list[tuple[int, int]], quick: bool) -> str:
     r = results
     gfs, hres, aifs = r["gfs"], r["hres"], r["aifs"]
@@ -999,7 +969,6 @@ def render_report(results: dict, months: list[tuple[int, int]], quick: bool) -> 
     return "\n".join(L)
 
 
-# ---------------------------------------------------------------- main
 def main() -> int:
     ap = argparse.ArgumentParser(description="T2 data availability audit")
     ap.add_argument("--quick", action="store_true", help="sample only 2 months; print to stdout")

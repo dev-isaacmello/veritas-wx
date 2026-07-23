@@ -49,7 +49,7 @@ def _retry(fn, attempts: int = 3, base_sleep: float = 5.0):
             time.sleep(base_sleep * (i + 1))
 
 
-G0 = 9.80665  # WMO standard gravity — ECMWF 'z' (m^2/s^2) -> meters
+G0 = 9.80665
 
 
 def fetch_ecmwf_orography(
@@ -124,8 +124,6 @@ def run(args: argparse.Namespace) -> None:
     with httpx.Client(follow_redirects=True) as client:
         if not args.no_orog:
             if args.model in ("gfs", "graphcast"):
-                # GraphCast is GFS-initialized on the SAME 0.25 graticule:
-                # GFS HGT:surface doubles as its grid elevation (ADR-0002).
                 orog = _retry(lambda: fetch_gfs_orography(client, inits[0]))
             else:
                 orog = _retry(lambda: fetch_ecmwf_orography(client, inits[0], args.model))
@@ -137,8 +135,6 @@ def run(args: argparse.Namespace) -> None:
                 try:
                     gc_run = _retry(lambda init=init: graphcast.GraphCastRun(init))
                 except (OSError, ValueError, httpx.HTTPError) as exc:
-                    # 50 known-missing runs in the window (ADR-0002): absence
-                    # becomes absence of pairs, never imputation.
                     print(f"[skip] {init:%Y%m%d%HZ}: run unavailable: {exc}", file=sys.stderr)
                     dropped["lead_fetch_failed"] += len(LEADS)
                     continue
@@ -195,7 +191,6 @@ def run(args: argparse.Namespace) -> None:
                     tp_series.setdefault(st_id, {})[lead] = mm
                 leads_ok.append(lead)
 
-            # precip rows for this init from the accumulated series
             precip_rows: list[dict] = []
             convention = MODEL_CONVENTION[args.model]
             for st in stations.select("station_id", "lat", "lon").to_dicts():
@@ -236,8 +231,8 @@ def run(args: argparse.Namespace) -> None:
     manifest.append(manifest_path, manifest_rows)
 
     expected = (
-        len(inits) * len(LEADS) * stations.height * 2  # t2m + wind rows per fetched lead
-        + len(inits) * len(PRECIP_LEADS) * stations.height  # potential precip rows
+        len(inits) * len(LEADS) * stations.height * 2
+        + len(inits) * len(PRECIP_LEADS) * stations.height
     )
     accounted = (
         points.height

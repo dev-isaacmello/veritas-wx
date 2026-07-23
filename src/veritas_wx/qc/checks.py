@@ -11,7 +11,7 @@ import polars as pl
 from veritas_wx.contracts import qc_bits
 
 _EPS = 1e-9
-_MAD_TO_SIGMA = 1.4826  # consistent estimator of sigma under normality
+_MAD_TO_SIGMA = 1.4826
 
 
 def _or_bit(df: pl.DataFrame, mask: pl.Expr, bit: int) -> pl.DataFrame:
@@ -70,9 +70,6 @@ def persistence_check(df: pl.DataFrame, params: dict) -> pl.DataFrame:
     min_repeats = p["min_repeats_hours"]
     over = ["station_id", "variable"]
 
-    # A run breaks when the value changes OR the time series has a gap (> 1 h):
-    # a stuck sensor reports continuously; identical values across a gap are
-    # separate episodes, not one long run.
     value_changed = (pl.col("value") != pl.col("value").shift(1).over(over)).fill_null(True)
     gapped = (
         (pl.col("valid_time") - pl.col("valid_time").shift(1).over(over)) != pl.duration(hours=1)

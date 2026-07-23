@@ -16,11 +16,10 @@ from veritas_wx.contracts.units import c_to_k
 API_BASE = "https://apitempo.inmet.gov.br"
 _HEADERS = {"User-Agent": "Mozilla/5.0 (veritas-wx research; +github)"}
 
-# INMET field -> (canonical variable, converter to canonical units)
 VAR_MAP: dict[str, tuple[str, callable]] = {
-    "TEM_INS": ("t2m", c_to_k),  # instantaneous at top of hour, degC -> K
-    "VEN_VEL": ("wind10m", float),  # m/s
-    "CHUVA": ("precip_1h", float),  # mm accumulated in the hour
+    "TEM_INS": ("t2m", c_to_k),
+    "VEN_VEL": ("wind10m", float),
+    "CHUVA": ("precip_1h", float),
 }
 
 
@@ -69,7 +68,7 @@ def rows_from_payload(
                     "variable": variable,
                     "value": value,
                     "source": "inmet",
-                    "source_qc_raw": None,  # apitempo exposes no per-value flag
+                    "source_qc_raw": None,
                     "ingest_version": ingest_version,
                 }
             )

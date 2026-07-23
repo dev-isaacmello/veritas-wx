@@ -64,12 +64,11 @@ def _obs(rows: list[dict]) -> pl.DataFrame:
 def test_derive_precip_24h_complete_window_by_hand():
     out = derive_precip_24h_obs(_obs(_hourly_precip("inmet:A", 24)))
     row = out.filter(pl.col("valid_time") == VT).to_dicts()[0]
-    assert row["obs"] == pytest.approx(24.0)  # 24 x 1.0 mm
+    assert row["obs"] == pytest.approx(24.0)
     assert row["n_clean_hours"] == 24 and row["qc_flags"] == 0
 
 
 def test_derive_precip_flagged_hours_excluded_but_visible():
-    # 2 flagged hours: sum of the 22 clean ones; window flags carry RANGE bit
     out = derive_precip_24h_obs(_obs(_hourly_precip("inmet:A", 24, flagged=2)))
     row = out.filter(pl.col("valid_time") == VT).to_dicts()[0]
     assert row["obs"] == pytest.approx(22.0)
@@ -79,18 +78,18 @@ def test_derive_precip_flagged_hours_excluded_but_visible():
 
 def test_derive_precip_incomplete_window_not_emitted():
     out = derive_precip_24h_obs(_obs(_hourly_precip("inmet:A", 20)))
-    assert out.filter(pl.col("valid_time") == VT).height == 0  # 20 < 22: no row
+    assert out.filter(pl.col("valid_time") == VT).height == 0
 
 
 def test_build_fact_end_to_end_accounting():
     fps = _fp(
         [
-            {"variable": "t2m", "value": 290.0},                      # pairs, adjusted
-            {"variable": "wind10m", "value": 5.0},                    # pairs, no adjustment
-            {"variable": "precip_24h", "value": 10.0},                # pairs via derived obs
-            {"variable": "t2m", "value": 291.0, "station_id": "inmet:B"},  # delta_z 10-1200
+            {"variable": "t2m", "value": 290.0},
+            {"variable": "wind10m", "value": 5.0},
+            {"variable": "precip_24h", "value": 10.0},
+            {"variable": "t2m", "value": 291.0, "station_id": "inmet:B"},
             {"variable": "t2m", "value": 292.0,
-             "valid_time": VT + dt.timedelta(hours=6), "lead_hours": 30},  # no obs there
+             "valid_time": VT + dt.timedelta(hours=6), "lead_hours": 30},
         ]
     )
     obs_rows = (
@@ -100,27 +99,23 @@ def test_build_fact_end_to_end_accounting():
              "source": "inmet", "source_qc_raw": None, "ingest_version": "test", "qc_flags": 0},
             {"station_id": "inmet:A", "valid_time": VT, "variable": "wind10m", "value": 4.0,
              "source": "inmet", "source_qc_raw": None, "ingest_version": "test", "qc_flags": 0},
-            # station B HAS an obs — its pair must die on delta_z, not on obs join
             {"station_id": "inmet:B", "valid_time": VT, "variable": "t2m", "value": 300.0,
              "source": "inmet", "source_qc_raw": None, "ingest_version": "test", "qc_flags": 0},
         ]
     )
     fact, dropped = build_fact(fps, _obs(obs_rows), _stations(), ingest_version="v-test")
 
-    # inmet:B t2m: delta_z = 10 - 1200 = -1190 -> |delta_z| > 500 -> dropped
     assert dropped["delta_z_exceeded"] == 1
-    # lead-30 t2m has no obs at that hour -> dropped
     assert dropped["obs_missing_or_incomplete"] == 1
     assert fact.height == 3
 
     by_var = {r["variable"]: r for r in fact.to_dicts()}
-    # golden: delta_z = 800 - 1200 = -400 => +2.6 K
     assert by_var["t2m"]["delta_z"] == pytest.approx(-400.0)
     assert by_var["t2m"]["fcst_elev_adj"] == pytest.approx(292.6)
     assert by_var["wind10m"]["fcst_elev_adj"] is None
     assert by_var["precip_24h"]["obs"] == pytest.approx(24.0)
     assert all(r["ingest_version"] == "v-test" for r in fact.to_dicts())
-    assert by_var["t2m"]["repr_floor"] is None  # no floors passed -> NULL
+    assert by_var["t2m"]["repr_floor"] is None
 
 
 def test_build_fact_attaches_repr_floor_when_available():

@@ -51,7 +51,6 @@ def test_extra_column_rejected_by_default():
     df = _fact_row().with_columns(pl.lit(1).alias("sneaky"))
     with pytest.raises(ContractError, match="sneaky"):
         validate(df, FACT_V1, "fact")
-    # but explicitly allowed when a stage adds columns on purpose
     validate(df, FACT_V1, "fact", allow_extra=True)
 
 
@@ -71,7 +70,7 @@ def test_all_problems_reported_at_once():
 
 def test_require_non_null():
     df = _fact_row()
-    require_non_null(df, ["station_id", "obs"], "fact")  # ok
+    require_non_null(df, ["station_id", "obs"], "fact")
     with pytest.raises(ContractError, match="repr_floor"):
         require_non_null(df, ["repr_floor"], "fact")
 
@@ -82,5 +81,4 @@ def test_qc_bits_are_frozen_powers_of_two():
     assert qc_bits.describe(qc_bits.RANGE | qc_bits.SPATIAL) == ["RANGE", "SPATIAL"]
     assert qc_bits.is_clean(0)
     assert not qc_bits.is_clean(qc_bits.DUPLICATE)
-    # consumer-chosen rigor: mask out DUPLICATE, record counts as clean
     assert qc_bits.is_clean(qc_bits.DUPLICATE, mask=qc_bits.RANGE | qc_bits.SPATIAL)

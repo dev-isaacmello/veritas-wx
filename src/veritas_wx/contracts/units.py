@@ -12,7 +12,7 @@ Silent unit drift is one of the most expensive bugs in this domain (risk R5).
 import math
 
 KELVIN_OFFSET = 273.15
-M_TO_MM = 1000.0  # ECMWF `tp` comes in meters of water equivalent
+M_TO_MM = 1000.0
 
 
 def c_to_k(celsius: float) -> float:

@@ -27,7 +27,6 @@ from veritas_wx.contracts.schemas import STATIONS_V1
 INMET_STATIONS_URL = "https://apitempo.inmet.gov.br/estacoes/T"
 ISD_HISTORY_URL = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
 
-# apitempo occasionally rejects generic clients; present a plain browser UA.
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
@@ -35,20 +34,14 @@ BROWSER_HEADERS = {
     "Accept": "application/json, text/plain, */*",
 }
 
-# Curation v0 bounding box (PLAN R6): coordinates outside => excluded.
-# Note: deliberately excludes far-offshore territories (e.g. São Pedro e São
-# Paulo at lon ~-29.3); those exclusions surface in the curation report.
 BRAZIL_BBOX = {"lat_min": -34.0, "lat_max": 6.0, "lon_min": -74.0, "lon_max": -32.0}
 
-# CD_SITUACAO substrings that mean the station is decommissioned. "Pane"
-# (malfunction) is NOT inactive: it may hold data inside the window; the v1
-# completeness cut (M4) is the right filter for it.
 INMET_INACTIVE_MARKERS = ("desativ", "encerr", "extint", "fechad")
 
-EARTH_RADIUS_KM = 6371.0088  # IUGG mean Earth radius
+EARTH_RADIUS_KM = 6371.0088
 
-_ELEV_SENTINEL_LOW = -900.0  # isd-history uses -999.0 for missing elevation
-_ELEV_SENTINEL_HIGH = 9000.0  # and +9999.9; Earth's surface never reaches these
+_ELEV_SENTINEL_LOW = -900.0
+_ELEV_SENTINEL_HIGH = 9000.0
 
 
 def _get_with_retries(
@@ -67,7 +60,7 @@ def _get_with_retries(
             )
             resp.raise_for_status()
             return resp
-        except httpx.HTTPError as exc:  # transport errors and 4xx/5xx alike
+        except httpx.HTTPError as exc:
             errors.append(f"attempt {attempt + 1}: {type(exc).__name__}: {exc}")
             if attempt < retries - 1:
                 time.sleep(backoff_s * (2**attempt))
@@ -179,7 +172,7 @@ def inmet_to_canonical(
     for rec in records:
         native_id = str(rec["CD_ESTACAO"]).strip()
         situacao = str(rec.get("CD_SITUACAO") or "").strip()
-        fim = str(rec.get("DT_FIM_OPERACAO") or "").strip()[:10]  # ISO date prefix
+        fim = str(rec.get("DT_FIM_OPERACAO") or "").strip()[:10]
 
         inactive = any(m in situacao.lower() for m in INMET_INACTIVE_MARKERS)
         if inactive_end_cutoff and fim and fim < inactive_end_cutoff:

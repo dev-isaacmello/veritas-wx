@@ -37,7 +37,6 @@ from veritas_wx.analyze.metrics.core import (  # noqa: E402
 from veritas_wx.analyze.strata import join_koppen, obs_percentile, season_of  # noqa: E402
 
 SEED = 20260723
-# Fixed entity->hue assignment (validated palette; never reassigned on subsets)
 MODEL_COLORS = {
     "aifs": "#2a78d6",
     "gfs": "#eb6834",
@@ -45,7 +44,7 @@ MODEL_COLORS = {
     "hres": "#eda100",
 }
 VARIABLES = ("t2m", "wind10m", "precip_24h")
-TABLE_LEADS = (24, 72, 120, 168, 240)  # registry family phase1_regimes
+TABLE_LEADS = (24, 72, 120, 168, 240)
 
 
 def load_fact(paths: list[str]) -> pl.DataFrame:
@@ -79,7 +78,6 @@ def fig_variance_ratio(fact: pl.DataFrame, out_dir: Path, n_boot: int) -> None:
     models = sorted(fact["model"].unique())
     fig, axes = plt.subplots(1, len(VARIABLES), figsize=(13, 4), sharex=True)
     for ax, variable in zip(axes, VARIABLES, strict=True):
-        # registry: variance_ratio uses RAW forecast
         frame = metric_ready(fact, variable, "raw")
         all_hi: list[float] = []
         for model in models:
@@ -96,15 +94,12 @@ def fig_variance_ratio(fact: pl.DataFrame, out_dir: Path, n_boot: int) -> None:
             all_hi.extend(hi)
             ax.plot(leads, est, color=color, linewidth=1.8, label=model)
             ax.fill_between(leads, lo, hi, color=color, alpha=0.15, linewidth=0)
-            if leads:  # direct label at line end (contrast relief for light hues)
+            if leads:
                 ax.annotate(
                     model, (leads[-1], est[-1]), xytext=(4, 0),
                     textcoords="offset points", fontsize=8, color="#333333", va="center",
                 )
         ax.axhline(1.0, color="#888888", linewidth=0.8, linestyle="--")
-        # Degenerate draws (std(obs)~0, dry samples) explode the CI to 1e15
-        # and make the panel unreadable; cap the AXIS (never the data) and
-        # say so — an honest zoom, not a clip of the registered metric.
         finite_hi = [h for h in all_hi if np.isfinite(h)]
         if finite_hi and max(finite_hi) > 5.0:
             ax.set_ylim(0.0, 3.0)
@@ -127,10 +122,9 @@ def fig_variance_ratio(fact: pl.DataFrame, out_dir: Path, n_boot: int) -> None:
 def fig_bias_by_percentile(fact: pl.DataFrame, out_dir: Path, n_boot: int) -> None:
     rng = np.random.default_rng(SEED)
     models = sorted(fact["model"].unique())
-    variables = ("t2m", "precip_24h")  # registry scope
+    variables = ("t2m", "precip_24h")
     fig, axes = plt.subplots(1, len(variables), figsize=(11, 4))
     for ax, variable in zip(axes, variables, strict=True):
-        # single-variable frame: percentile groups by station_id alone
         frame = obs_percentile(metric_ready(fact, variable, "elev_adj_when_available"))
         n_models = len(models)
         for k, model in enumerate(models):

@@ -20,7 +20,6 @@ def test_plan_golden_example():
 
 
 def test_station_above_cell_gets_colder():
-    # station 1500 m, cell 500 m => dz = +1000 => -6.5 K
     dz = delta_z(1500.0, 500.0)
     assert lapse_adjust(280.0, dz) == pytest.approx(273.5)
 

@@ -20,7 +20,6 @@ from pathlib import Path
 
 import httpx
 
-# Beck et al. (2023) legend.txt, verbatim. 0 = ocean/no data.
 KOPPEN_CLASS_BY_VALUE: dict[int, str] = {
     1: "Af", 2: "Am", 3: "Aw",
     4: "BWh", 5: "BWk", 6: "BSh", 7: "BSk",
@@ -33,10 +32,8 @@ KOPPEN_CLASS_BY_VALUE: dict[int, str] = {
     29: "ET", 30: "EF",
 }
 
-# Known-good sources, tried in order. Each entry: zip URL + member to extract.
 KOPPEN_SOURCES: tuple[dict[str, str], ...] = (
     {
-        # figshare article 21789074 (GloH2O / Beck et al. 2023), file 61012822
         "url": "https://ndownloader.figshare.com/files/61012822",
         "member": "1991_2020/koppen_geiger_0p00833333.tif",
     },

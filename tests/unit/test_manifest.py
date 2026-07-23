@@ -8,7 +8,6 @@ from veritas_wx.ingest import manifest
 def test_sha256_known_vector(tmp_path):
     p = tmp_path / "f.bin"
     p.write_bytes(b"abc")
-    # canonical SHA-256 test vector for "abc"
     assert (
         manifest.sha256_of(p)
         == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
@@ -43,5 +42,4 @@ def test_pruned_still_counts_as_fetched(tmp_path):
         source="s3://b", model=None, init_time=None, status="pruned",
     )
     df = manifest.append(path, [r])
-    # raw file pruned after extraction: re-runs must NOT re-download
     assert manifest.is_fetched(df, "s3://b/z")

@@ -26,9 +26,6 @@ import polars as pl
 
 from veritas_wx.analyze.bootstrap import BootstrapResult, moving_block_bootstrap
 
-#: Percentile bins registered in metrics_registry.yaml
-#: (strata.obs_percentile_bin). Half-open [lo, hi), except the last bin which
-#: is closed [99, 100] so that obs_pct == 100 belongs to "99-100".
 REGISTRY_BINS: tuple[str, ...] = (
     "0-10",
     "10-20",
@@ -44,9 +41,6 @@ REGISTRY_BINS: tuple[str, ...] = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Scalar statistics (bootstrap building blocks — floats, not public API)
-# ---------------------------------------------------------------------------
 def mae_stat(df: pl.DataFrame) -> float:
     """Registry ``mae``: mean(|fcst - obs|)."""
     return float(df.select((pl.col("fcst") - pl.col("obs")).abs().mean()).item())
@@ -104,9 +98,6 @@ def variance_ratio_stat(df: pl.DataFrame) -> float:
     return float(np.median(ratios))
 
 
-# ---------------------------------------------------------------------------
-# Public API — always through the moving block bootstrap
-# ---------------------------------------------------------------------------
 def _with_error(df: pl.DataFrame) -> pl.DataFrame:
     """Attach ``error = fcst - obs`` when absent (pure; input untouched).
 

@@ -27,14 +27,13 @@ from veritas_wx.match.extract import DecodedField
 BUCKET_URL = "https://noaa-oar-mlwp-data.s3.amazonaws.com"
 PREFIX = "GRAP_v100_GFS"
 STEP_HOURS = 6
-N_STEPS = 41  # f000..f240
+N_STEPS = 41
 
-# HDF5 dataset -> (GRIB-convention shortName, units attr we REQUIRE)
 VAR_MAP: dict[str, tuple[str, str]] = {
     "t2": ("2t", "K"),
     "u10": ("10u", "m s-1"),
     "v10": ("10v", "m s-1"),
-    "apcp": ("tp", "m"),  # meters! extract.precip converts m -> mm by units
+    "apcp": ("tp", "m"),
 }
 
 

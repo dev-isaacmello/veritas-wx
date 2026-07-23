@@ -53,7 +53,6 @@ def _flagged(df: pl.DataFrame, bit: int) -> list[bool]:
     return [(f & bit) != 0 for f in df["qc_flags"].to_list()]
 
 
-# ---------------------------------------------------------------- RANGE
 
 def test_range_flags_physical_impossibility():
     df = _obs(
@@ -68,18 +67,15 @@ def test_range_flags_physical_impossibility():
     by_val = dict(zip(out["value"].to_list(), _flagged(out, qc_bits.RANGE), strict=True))
     assert by_val[400.0] and by_val[-5.0] and by_val[250.0]
     assert not by_val[298.15]
-    assert out.height == df.height  # never deletes
+    assert out.height == df.height
 
 
-# ---------------------------------------------------------------- STEP
 
 def test_step_flags_only_consecutive_hours():
     rows = [
-        # 10 K jump between consecutive hours -> the LATER reading is flagged
         {"station_id": "inmet:A1", "variable": "t2m", "valid_time": T0, "value": 295.0},
         {"station_id": "inmet:A1", "variable": "t2m",
          "valid_time": T0 + dt.timedelta(hours=1), "value": 305.0},
-        # same jump across a 6 h gap -> no evidence, no flag
         {"station_id": "inmet:A2", "variable": "t2m", "valid_time": T0, "value": 295.0},
         {"station_id": "inmet:A2", "variable": "t2m",
          "valid_time": T0 + dt.timedelta(hours=6), "value": 305.0},
@@ -91,14 +87,13 @@ def test_step_flags_only_consecutive_hours():
     assert _flagged(a2, qc_bits.STEP) == [False, False]
 
 
-# ---------------------------------------------------------------- PERSISTENCE
 
 def _hourly(station: str, variable: str, values: list[float], gap_at: int | None = None):
     rows = []
     t = T0
     for i, v in enumerate(values):
         if gap_at is not None and i == gap_at:
-            t += dt.timedelta(hours=2)  # inject a gap
+            t += dt.timedelta(hours=2)
         rows.append({"station_id": station, "variable": variable, "valid_time": t, "value": v})
         t += dt.timedelta(hours=1)
     return rows
@@ -115,7 +110,6 @@ def test_persistence_short_run_not_flagged():
 
 
 def test_persistence_gap_breaks_run():
-    # 7 identical readings but a 2 h gap after the 3rd: runs of 3 and 4 -> no flag
     out = checks.persistence_check(
         _obs(_hourly("inmet:A1", "t2m", [297.0] * 7, gap_at=3)), _params()
     )
@@ -131,7 +125,6 @@ def test_persistence_exemptions_calm_wind_and_dry_spell():
     assert all(_flagged(out.filter(pl.col("station_id") == "inmet:A2"), qc_bits.PERSISTENCE))
 
 
-# ---------------------------------------------------------------- SPATIAL
 
 def test_spatial_flags_outlier_against_neighbors():
     stations = [f"inmet:A{i}" for i in range(6)]
@@ -139,7 +132,6 @@ def test_spatial_flags_outlier_against_neighbors():
         {"station_id": s, "variable": "t2m", "valid_time": T0, "value": v}
         for s, v in zip(stations, [293.0, 293.1, 292.9, 293.05, 292.95, 308.0], strict=True)
     ]
-    # A5 (outlier) and A0 (normal) each have the other five as neighbors
     pairs = pl.DataFrame(
         {
             "station_id": ["inmet:A5"] * 5 + ["inmet:A0"] * 5,
@@ -148,7 +140,7 @@ def test_spatial_flags_outlier_against_neighbors():
     )
     out = checks.spatial_check(_obs(rows), _params(), pairs)
     flags = dict(zip(out["station_id"].to_list(), _flagged(out, qc_bits.SPATIAL), strict=True))
-    assert flags["inmet:A5"]  # 15 K above robust neighborhood -> flagged
+    assert flags["inmet:A5"]
     assert not flags["inmet:A0"]
 
 
@@ -162,7 +154,7 @@ def test_spatial_needs_three_neighbors():
         {"station_id": ["inmet:A0"] * 2, "neighbor_id": ["inmet:A1", "inmet:A2"]}
     )
     out = checks.spatial_check(_obs(rows), _params(), pairs)
-    assert not any(_flagged(out, qc_bits.SPATIAL))  # 2 neighbors < 3: no evidence
+    assert not any(_flagged(out, qc_bits.SPATIAL))
 
 
 def test_spatial_mad_collapse_does_not_flag_normal_reading():
@@ -179,7 +171,7 @@ def test_spatial_mad_collapse_does_not_flag_normal_reading():
     )
     out = checks.spatial_check(_obs(rows), _params(), pairs)
     flags = dict(zip(out["station_id"].to_list(), _flagged(out, qc_bits.SPATIAL), strict=True))
-    assert not flags["inmet:A5"]  # 3 K / floor 1.5 K => z=2 < 5: normal, not flagged
+    assert not flags["inmet:A5"]
 
 
 def test_spatial_mad_collapse_still_flags_gross_error():
@@ -193,7 +185,7 @@ def test_spatial_mad_collapse_still_flags_gross_error():
     )
     out = checks.spatial_check(_obs(rows), _params(), pairs)
     flags = dict(zip(out["station_id"].to_list(), _flagged(out, qc_bits.SPATIAL), strict=True))
-    assert flags["inmet:A5"]  # 20 K / floor 1.5 K => z=13.3 > 5: gross error
+    assert flags["inmet:A5"]
 
 
 def test_spatial_precip_exempt_even_when_extreme():
@@ -211,12 +203,11 @@ def test_spatial_precip_exempt_even_when_extreme():
     assert not any(_flagged(out, qc_bits.SPATIAL))
 
 
-# ---------------------------------------------------------------- METADATA
 
 def test_metadata_propagates_station_suspicion_to_observations():
     stations = _stations(
         [
-            {"station_id": "inmet:BAD", "elev_station": 800.0, "elev_dem": 950.0},  # |diff|=150
+            {"station_id": "inmet:BAD", "elev_station": 800.0, "elev_dem": 950.0},
             {"station_id": "inmet:OK", "elev_station": 800.0, "elev_dem": 850.0},
             {"station_id": "inmet:NOLL", "lat": None},
         ]
@@ -232,7 +223,6 @@ def test_metadata_propagates_station_suspicion_to_observations():
     assert flags["inmet:BAD"] and flags["inmet:NOLL"] and not flags["inmet:OK"]
 
 
-# ---------------------------------------------------------------- DUPLICATE
 
 def test_duplicate_flags_secondary_network_only():
     stations = _stations(
@@ -246,7 +236,6 @@ def test_duplicate_flags_secondary_network_only():
             {"station_id": "inmet:A801", "variable": "t2m", "valid_time": T0, "value": 298.15},
             {"station_id": "isd:829", "variable": "t2m", "valid_time": T0, "value": 298.17,
              "source": "isd"},
-            # differs beyond tolerance at another hour -> independent info, kept clean
             {"station_id": "inmet:A801", "variable": "t2m",
              "valid_time": T0 + dt.timedelta(hours=1), "value": 298.0},
             {"station_id": "isd:829", "variable": "t2m",
@@ -261,11 +250,10 @@ def test_duplicate_flags_secondary_network_only():
     assert flags[2][1] is False and flags[3][1] is False
 
 
-# ---------------------------------------------------------------- RUNNER
 
 def test_runner_preserves_every_row_and_validates_contract():
     stations = _stations([{"station_id": "inmet:A1"}])
     df = _obs(_hourly("inmet:A1", "t2m", [297.0 + i * 0.1 for i in range(24)]))
     out = run_qc(df.drop("qc_flags"), _params(), stations)
-    assert out.height == df.height  # QC NEVER drops rows
+    assert out.height == df.height
     validate(out, OBS_QC_V1, "obs_qc")

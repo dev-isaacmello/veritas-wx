@@ -14,7 +14,6 @@ T = [dt.datetime(2025, 8, 1, h, tzinfo=UTC) for h in range(3)]
 def _stations() -> pl.DataFrame:
     return pl.DataFrame(
         {
-            # A and B share the 0.25° cell; C is alone in another cell
             "station_id": ["inmet:A", "inmet:B", "inmet:C"],
             "lat": [-30.10, -30.20, -12.10],
             "lon": [-51.10, -51.20, -45.10],
@@ -24,10 +23,6 @@ def _stations() -> pl.DataFrame:
 
 def _obs() -> pl.DataFrame:
     rows = []
-    # across-station values at each instant (variance by hand, ddof=1):
-    #   t0: (1, 3)  -> var 2.0
-    #   t1: (2, 2)  -> var 0.0
-    #   t2: (0, 4)  -> var 8.0        => temporal median = 2.0
     for t, (va, vb) in zip(T, [(1.0, 3.0), (2.0, 2.0), (0.0, 4.0)], strict=True):
         rows.append({"station_id": "inmet:A", "valid_time": t, "variable": "t2m", "value": va})
         rows.append({"station_id": "inmet:B", "valid_time": t, "variable": "t2m", "value": vb})
@@ -44,7 +39,7 @@ def test_same_cell_assignment():
 
 def test_floor_is_temporal_median_of_across_station_variance():
     floors = repr_floor_by_cell(_obs(), _stations())
-    assert floors.height == 1  # only the 2-station cell qualifies
+    assert floors.height == 1
     row = floors.to_dicts()[0]
     assert row["repr_floor"] == pytest.approx(2.0)
     assert row["n_stations"] == 2
@@ -63,5 +58,5 @@ def test_lone_station_cell_gets_null_never_imputed():
     out = attach_repr_floor(pairs, floors, _stations())
     by_st = {r["station_id"]: r for r in out.to_dicts()}
     assert by_st["inmet:A"]["repr_floor"] == pytest.approx(2.0)
-    assert by_st["inmet:C"]["repr_floor"] is None  # NULL, never imputed
-    assert "cell_y" not in out.columns  # helper columns cleaned up
+    assert by_st["inmet:C"]["repr_floor"] is None
+    assert "cell_y" not in out.columns

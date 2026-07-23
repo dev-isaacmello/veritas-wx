@@ -36,11 +36,10 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) veritas-wx research; 
 MISSING_SENTINEL = -9999.0
 N_METADATA_LINES = 8
 
-# normalized (accent-stripped, uppercased) header substring -> (variable, converter)
 COLUMN_MAP: dict[str, tuple[str, callable]] = {
-    "PRECIPITACAO TOTAL": ("precip_1h", float),  # mm accumulated in the hour
-    "TEMPERATURA DO AR - BULBO SECO": ("t2m", c_to_k),  # degC -> K
-    "VENTO, VELOCIDADE": ("wind10m", float),  # m/s
+    "PRECIPITACAO TOTAL": ("precip_1h", float),
+    "TEMPERATURA DO AR - BULBO SECO": ("t2m", c_to_k),
+    "VENTO, VELOCIDADE": ("wind10m", float),
 }
 
 
@@ -136,7 +135,7 @@ def parse_station_csv(
                     "variable": variable,
                     "value": convert(raw),
                     "source": "inmet",
-                    "source_qc_raw": None,  # bulk CSVs expose no per-value flag
+                    "source_qc_raw": None,
                     "ingest_version": ingest_version,
                 }
             )

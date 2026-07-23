@@ -17,7 +17,6 @@ from veritas_wx.ingest.static.stations import (
     to_canonical,
 )
 
-# One degree of latitude on the mean-radius sphere: 2*pi*6371.0088/360 km.
 ONE_DEG_LAT_KM = 111.19
 
 
@@ -61,13 +60,10 @@ def row(df: pl.DataFrame, station_id: str) -> dict:
     return sub.row(0, named=True)
 
 
-# -- haversine ---------------------------------------------------------------
 
 
 def test_haversine_golden_one_degree_latitude():
-    # Hand value: 2*pi*R/360 = 2*pi*6371.0088/360 = 111.1949 km.
     assert haversine_km(0.0, 0.0, 1.0, 0.0) == pytest.approx(ONE_DEG_LAT_KM, abs=0.05)
-    # Same along the equator for one degree of longitude.
     assert haversine_km(0.0, 0.0, 0.0, 1.0) == pytest.approx(ONE_DEG_LAT_KM, abs=0.05)
 
 
@@ -78,7 +74,6 @@ def test_haversine_zero_and_symmetry():
     assert d_ab == pytest.approx(d_ba, rel=1e-12)
 
 
-# -- cross-network dedupe ----------------------------------------------------
 
 
 def test_dedupe_within_2km_inmet_wins_and_cross_ref_both_ways():
@@ -86,12 +81,12 @@ def test_dedupe_within_2km_inmet_wins_and_cross_ref_both_ways():
     df = frame(
         [
             station("inmet:A001", -15.0, -48.0),
-            station("isd:829830-99999", -15.0 + one_km_in_deg, -48.0),  # ~1 km north
+            station("isd:829830-99999", -15.0 + one_km_in_deg, -48.0),
         ]
     )
     out = dedupe_cross_network(df, max_km=2.0)
 
-    assert out.height == df.height  # pure: no rows dropped
+    assert out.height == df.height
     inmet = row(out, "inmet:A001")
     isd = row(out, "isd:829830-99999")
 
@@ -109,7 +104,7 @@ def test_dedupe_beyond_2km_no_change():
     df = frame(
         [
             station("inmet:A001", -15.0, -48.0),
-            station("isd:829830-99999", -15.0 + ten_km_in_deg, -48.0),  # ~10 km
+            station("isd:829830-99999", -15.0 + ten_km_in_deg, -48.0),
         ]
     )
     out = dedupe_cross_network(df, max_km=2.0)
@@ -132,20 +127,18 @@ def test_dedupe_ignores_already_excluded_counterparts():
         ]
     )
     out = dedupe_cross_network(df, max_km=2.0)
-    # The INMET twin is dead: the ISD station must survive as the site's record.
     assert row(out, "isd:820000-99999")["status"] == "included"
     assert row(out, "inmet:A002")["exclusion_reason"] == "inactive"
 
 
-# -- 0.25 degree cell accounting (R7) ---------------------------------------
 
 
 def test_count_cells_two_of_three_stations_share_a_cell():
     df = frame(
         [
-            station("inmet:A001", -15.05, -47.95),  # cell (-61, -192)
-            station("inmet:A002", -15.20, -47.90),  # same cell
-            station("isd:820000-99999", -10.0, -40.0),  # different cell
+            station("inmet:A001", -15.05, -47.95),
+            station("inmet:A002", -15.20, -47.90),
+            station("isd:820000-99999", -10.0, -40.0),
         ]
     )
     assert count_cells_with_min_stations(df, res=0.25, min_n=2) == 1
@@ -163,15 +156,14 @@ def test_count_cells_excluded_stations_do_not_count():
     assert count_cells_with_min_stations(df, res=0.25, min_n=2) == 0
 
 
-# -- Brazil bounding box rule ------------------------------------------------
 
 
 def test_bbox_rule_excludes_outside_and_keeps_inside():
     df = frame(
         [
-            station("inmet:A001", -15.0, -48.0),  # inside
-            station("inmet:A899", -35.5, -55.0),  # south of the box
-            station("isd:999999-11111", 0.92, -29.35),  # SPSP archipelago: lon > -32
+            station("inmet:A001", -15.0, -48.0),
+            station("inmet:A899", -35.5, -55.0),
+            station("isd:999999-11111", 0.92, -29.35),
         ]
     )
     out = flag_out_of_bbox(df)
@@ -195,11 +187,9 @@ def test_bbox_rule_null_coords_and_existing_exclusions():
     out = flag_out_of_bbox(df)
     nul = row(out, "inmet:A777")
     assert (nul["status"], nul["exclusion_reason"]) == ("excluded", "invalid_coords")
-    # an earlier exclusion reason is never overwritten
     assert row(out, "inmet:A778")["exclusion_reason"] == "inactive"
 
 
-# -- whole-network exclusion (ADR-0002 §1: ISD archive frozen) ---------------
 
 
 def test_exclude_network_phase1_benches_isd_keeps_inmet():
@@ -218,14 +208,11 @@ def test_exclude_network_phase1_benches_isd_keeps_inmet():
     assert row(out, "inmet:A001")["status"] == "included"
     benched = row(out, "isd:820980-99999")
     assert (benched["status"], benched["exclusion_reason"]) == ("excluded", "isd_archive_frozen")
-    # a frozen archive trumps a pending review
     review = row(out, "isd:829830-99999")
     assert (review["status"], review["exclusion_reason"]) == ("excluded", "isd_archive_frozen")
-    # an earlier exclusion reason is never overwritten (first cause wins)
     assert row(out, "isd:834840-99999")["exclusion_reason"] == "inactive"
 
 
-# -- elevation mismatch => review queue (R6) ---------------------------------
 
 
 def test_elev_mismatch_over_100m_goes_to_review():
@@ -241,8 +228,8 @@ def test_elev_mismatch_over_100m_goes_to_review():
     reviewed = row(out, "inmet:A001")
     assert reviewed["status"] == "review"
     assert reviewed["exclusion_reason"] == "elev_diff_gt_100m"
-    assert row(out, "inmet:A002")["status"] == "included"  # |Δ| = 50 m
-    assert row(out, "inmet:A003")["status"] == "included"  # no DEM: nothing to compare
+    assert row(out, "inmet:A002")["status"] == "included"
+    assert row(out, "inmet:A003")["status"] == "included"
 
 
 def test_elev_diff_exactly_at_threshold_is_not_review():
@@ -250,7 +237,6 @@ def test_elev_diff_exactly_at_threshold_is_not_review():
     assert row(flag_elev_review(df, max_diff_m=100.0), "inmet:A004")["status"] == "included"
 
 
-# -- canonical mapping -------------------------------------------------------
 
 
 INMET_FIXTURE = [
@@ -271,7 +257,7 @@ INMET_FIXTURE = [
         "SG_ESTADO": "RS",
         "VL_LATITUDE": "-30.0",
         "VL_LONGITUDE": "-51.0",
-        "VL_ALTITUDE": None,  # absent elevation must stay NULL, never 0
+        "VL_ALTITUDE": None,
         "DT_INICIO_OPERACAO": "2001-01-01T21:00:00.000-03:00",
         "DT_FIM_OPERACAO": None,
         "CD_SITUACAO": "Desativada",
@@ -285,7 +271,7 @@ INMET_FIXTURE = [
         "VL_ALTITUDE": "100.0",
         "DT_INICIO_OPERACAO": "2001-01-01T21:00:00.000-03:00",
         "DT_FIM_OPERACAO": "2021-01-07T21:00:00.000-03:00",
-        "CD_SITUACAO": "Operante",  # metadata contradiction seen in the wild
+        "CD_SITUACAO": "Operante",
     },
 ]
 
@@ -303,7 +289,7 @@ def test_inmet_canonical_inactive_rule_and_null_elevation():
 
     desativada = row(df, "inmet:A999")
     assert (desativada["status"], desativada["exclusion_reason"]) == ("excluded", "inactive")
-    assert desativada["elev_station"] is None  # never 0
+    assert desativada["elev_station"] is None
 
     ended = row(df, "inmet:A941")
     assert (ended["status"], ended["exclusion_reason"]) == ("excluded", "inactive")
@@ -321,9 +307,9 @@ ISD_CSV_FIXTURE = (
 def test_parse_isd_history_filters_and_accounts_every_row():
     df, dropped = parse_isd_history(ISD_CSV_FIXTURE, min_end="20250701")
 
-    assert df.height == 1  # only active Manaus survives
+    assert df.height == 1
     assert dropped == {"not_country": 1, "end_before_min": 1, "invalid_coords": 1}
-    assert df.height + sum(dropped.values()) == 4  # runlog reconciliation holds
+    assert df.height + sum(dropped.values()) == 4
 
     canon = to_canonical([], df, ingest_version="0.1.0+test.deadbeef")
     validate(canon, STATIONS_V1, "STATIONS_V1")
@@ -335,6 +321,6 @@ def test_parse_isd_history_filters_and_accounts_every_row():
 
 
 def test_isd_elevation_sentinel_becomes_null():
-    df, _ = parse_isd_history(ISD_CSV_FIXTURE, min_end="20180101")  # keeps VELHA too
+    df, _ = parse_isd_history(ISD_CSV_FIXTURE, min_end="20180101")
     canon = to_canonical([], df, ingest_version="0.1.0+test.deadbeef")
     assert row(canon, "isd:820000-99999")["elev_station"] is None
