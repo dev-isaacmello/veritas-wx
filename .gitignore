@@ -1,0 +1,19 @@
+# data lake lives on the 1TB HD (data -> /media/.../veritas-wx-data symlink)
+data
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# tooling caches
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.ipynb_checkpoints/
+
+# local scratch
+*.tmp
+.DS_Store

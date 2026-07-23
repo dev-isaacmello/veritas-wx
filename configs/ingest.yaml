@@ -1,0 +1,70 @@
+# Parâmetros de ingestão e matching — o hash deste arquivo compõe ingest_version.
+# Mudou parâmetro => nova ingest_version => reprocessamento auditável, nunca overwrite.
+
+window:
+  start: "2025-07-01"   # AIFS operacional desde 2025-02-25 — janela coberta
+  end: "2026-06-30"     # inclusivo; sujeito a confirmação da auditoria (docs/data_audit.md)
+
+runs_utc: [0, 12]       # denominador comum dos 4 sistemas
+
+leads_hours:
+  start: 6
+  stop: 240
+  step: 6
+
+precip_leads_hours:     # janela [lead-24, lead]
+  start: 24
+  stop: 240
+  step: 6
+
+variables: [t2m, wind10m, precip_24h]
+
+models:
+  gfs:
+    source: "s3://noaa-gfs-bdp-pds"
+    format: grib2_idx          # subsetting por byte-range via .idx
+  hres:
+    source: "s3://ecmwf-forecasts"
+    product: "ifs/0p25/oper"
+    format: grib2_index        # subsetting por byte-range via .index
+  aifs:
+    source: "s3://ecmwf-forecasts"
+    product: "aifs-single/0p25/oper"
+    format: grib2_index
+  graphcast:
+    source: "s3://noaa-oar-mlwp-data"
+    product: "GRAP_v100_GFS"   # stream GFS-init (D6); prefixo confirmado na auditoria
+    format: netcdf
+
+observations:
+  inmet:
+    api: "https://apitempo.inmet.gov.br"
+    fallback: bdmep_bulk
+    precip_priority: true      # pluviômetro horário INMET é a fonte primária de precip
+  isd:
+    inventory: "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+    format: isd_lite
+
+static:
+  dem: "s3://copernicus-dem-30m"           # GLO-30, leitura COG por janela
+  koppen: "beck_2023_koppen_geiger_1km"    # URL fixada na auditoria
+  oni: "https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt"
+  mjo_rmm: "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+
+match:
+  max_delta_z_m: 500           # pares além disso: descartados e CONTADOS (nunca silencioso)
+  interp:
+    t2m: bilinear
+    wind10m: bilinear          # magnitude computada nos nós ANTES de interpolar
+    precip_24h: nearest        # preserva extremos
+  precip_completeness_min_hours: 22   # de 24; senão o par não é emitido (contado)
+
+storage:
+  data_root: "data"            # symlink -> HD 1TB (veritas-wx-data/)
+  mount:
+    device: "/dev/sda3"
+    expected_path: "/media/uiliam-isaac-da-silva-mello/F4D45654D4561966"
+    # a partição NÃO monta sozinha no boot: todo script de build roda
+    # ensure_mounted() (udisksctl, sem sudo) antes de tocar no data_root
+  prune_raw: true              # raw local podável após extração; manifests (sha256)
+                               # + buckets públicos garantem auditabilidade

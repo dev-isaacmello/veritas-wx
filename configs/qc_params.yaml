@@ -1,0 +1,29 @@
+# Parâmetros dos checks de QC — PROVISÓRIOS até calibração com dados reais (M4).
+# Unidades canônicas: K, m/s, mm. Versionado: mudar limiar => novo ingest_version.
+
+calibrated: false   # vira true na M4, com ADR justificando cada limiar
+
+range:              # plausibilidade física ampla p/ Brasil; aperta por Köppen×mês na M4
+  t2m:      {min: 228.15, max: 323.15}   # -45 °C .. +50 °C
+  wind10m:  {min: 0.0,    max: 60.0}
+  precip_1h: {min: 0.0,   max: 200.0}    # aplicado à obs horária, antes da agregação 24h
+
+step:               # variação máxima plausível entre leituras horárias consecutivas
+  t2m: 8.0          # K/h
+  wind10m: 25.0     # m/s por hora
+
+persistence:
+  min_repeats_hours: 6
+  wind_calm_exempt_below: 0.5   # m/s — calmaria prolongada real não é sensor travado
+  precip_zero_exempt: true      # zeros repetidos de chuva são o estado normal
+
+spatial:
+  neighbors_k: 5
+  radius_km: 300
+  max_mad_z: 5.0    # |desvio vs mediana dos vizinhos| / MAD
+
+metadata:
+  max_elev_diff_m: 100          # |elev_metadado - elev_DEM| acima disso => bit METADATA
+
+duplicate:
+  value_tolerance: 0.05         # mesma leitura física via duas redes (cross_ref)
