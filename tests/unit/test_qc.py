@@ -165,6 +165,52 @@ def test_spatial_needs_three_neighbors():
     assert not any(_flagged(out, qc_bits.SPATIAL))  # 2 neighbors < 3: no evidence
 
 
+def test_spatial_mad_collapse_does_not_flag_normal_reading():
+    """ADR-0003: neighbors reporting the identical rounded value give MAD=0;
+    without the sigma floor a 3 K microclimate difference would explode to
+    z=inf and flag a perfectly normal reading."""
+    stations = [f"inmet:A{i}" for i in range(6)]
+    rows = [
+        {"station_id": s, "variable": "t2m", "valid_time": T0, "value": v}
+        for s, v in zip(stations, [293.0, 293.0, 293.0, 293.0, 293.0, 296.0], strict=True)
+    ]
+    pairs = pl.DataFrame(
+        {"station_id": ["inmet:A5"] * 5, "neighbor_id": stations[:5]}
+    )
+    out = checks.spatial_check(_obs(rows), _params(), pairs)
+    flags = dict(zip(out["station_id"].to_list(), _flagged(out, qc_bits.SPATIAL), strict=True))
+    assert not flags["inmet:A5"]  # 3 K / floor 1.5 K => z=2 < 5: normal, not flagged
+
+
+def test_spatial_mad_collapse_still_flags_gross_error():
+    stations = [f"inmet:A{i}" for i in range(6)]
+    rows = [
+        {"station_id": s, "variable": "t2m", "valid_time": T0, "value": v}
+        for s, v in zip(stations, [293.0, 293.0, 293.0, 293.0, 293.0, 313.0], strict=True)
+    ]
+    pairs = pl.DataFrame(
+        {"station_id": ["inmet:A5"] * 5, "neighbor_id": stations[:5]}
+    )
+    out = checks.spatial_check(_obs(rows), _params(), pairs)
+    flags = dict(zip(out["station_id"].to_list(), _flagged(out, qc_bits.SPATIAL), strict=True))
+    assert flags["inmet:A5"]  # 20 K / floor 1.5 K => z=13.3 > 5: gross error
+
+
+def test_spatial_precip_exempt_even_when_extreme():
+    """ADR-0003: hourly convective rain is spotty — a real 80 mm cell above
+    dry neighbors is signal, not sensor error. Never spatially flagged."""
+    stations = [f"inmet:A{i}" for i in range(6)]
+    rows = [
+        {"station_id": s, "variable": "precip_1h", "valid_time": T0, "value": v}
+        for s, v in zip(stations, [0.0, 0.0, 0.0, 0.0, 0.0, 80.0], strict=True)
+    ]
+    pairs = pl.DataFrame(
+        {"station_id": ["inmet:A5"] * 5, "neighbor_id": stations[:5]}
+    )
+    out = checks.spatial_check(_obs(rows), _params(), pairs)
+    assert not any(_flagged(out, qc_bits.SPATIAL))
+
+
 # ---------------------------------------------------------------- METADATA
 
 def test_metadata_propagates_station_suspicion_to_observations():

@@ -98,10 +98,20 @@ def spatial_check(df: pl.DataFrame, params: dict, neighbor_pairs: pl.DataFrame) 
 
     ``neighbor_pairs`` (station_id, neighbor_id) is precomputed from curated
     station coordinates (k nearest within radius_km) — passed in to keep this
-    function pure. Flags |value - median(neighbors)| / (1.4826*MAD) > max_mad_z,
-    requiring >= 3 reporting neighbors; fewer neighbors -> no evidence, no flag.
+    function pure. Flags |value - median(neighbors)| / max(1.4826*MAD, floor)
+    > max_mad_z, requiring >= 3 reporting neighbors; fewer neighbors -> no
+    evidence, no flag.
+
+    Calibration (ADR-0003): with k<=5 neighbors reporting at 0.1 resolution
+    the MAD collapses to ~0 and the z-score explodes on perfectly normal
+    readings, so each variable carries a ``sigma_floor`` (a lower bound on
+    the robust sigma). Variables in ``exempt_variables`` are never flagged —
+    hourly convective precipitation is spatially spotty by nature, and
+    flagging real peaks would bias verification against extreme events.
     """
     z_max = params["spatial"]["max_mad_z"]
+    floors: dict[str, float] = params["spatial"].get("sigma_floor", {})
+    exempt: list[str] = params["spatial"].get("exempt_variables", [])
 
     neighbor_obs = df.select(
         pl.col("station_id").alias("neighbor_id"),
@@ -119,10 +129,17 @@ def spatial_check(df: pl.DataFrame, params: dict, neighbor_pairs: pl.DataFrame) 
         )
     )
     out = df.join(nb, on=["station_id", "variable", "valid_time"], how="left")
-    robust_z = (pl.col("value") - pl.col("_nb_med")).abs() / (
-        _MAD_TO_SIGMA * pl.col("_nb_mad") + _EPS
+
+    floor_expr = pl.lit(0.0)
+    for variable, floor in floors.items():
+        floor_expr = (
+            pl.when(pl.col("variable") == variable).then(pl.lit(floor)).otherwise(floor_expr)
+        )
+    robust_sigma = pl.max_horizontal(_MAD_TO_SIGMA * pl.col("_nb_mad"), floor_expr) + _EPS
+    robust_z = (pl.col("value") - pl.col("_nb_med")).abs() / robust_sigma
+    mask = (
+        (pl.col("_nb_n") >= 3) & (robust_z > z_max) & ~pl.col("variable").is_in(exempt)
     )
-    mask = (pl.col("_nb_n") >= 3) & (robust_z > z_max)
     return _or_bit(out, mask, qc_bits.SPATIAL).drop("_nb_med", "_nb_mad", "_nb_n")
 
 

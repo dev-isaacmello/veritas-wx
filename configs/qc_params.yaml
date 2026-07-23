@@ -1,7 +1,7 @@
-# Parâmetros dos checks de QC — PROVISÓRIOS até calibração com dados reais (M4).
+# Parâmetros dos checks de QC — CALIBRADOS na M4 contra obs_inmet_v0 (ADR-0003).
 # Unidades canônicas: K, m/s, mm. Versionado: mudar limiar => novo ingest_version.
 
-calibrated: false   # vira true na M4, com ADR justificando cada limiar
+calibrated: true    # evidência: docs/decisions/ADR-0003-qc-calibration.md
 
 range:              # plausibilidade física ampla p/ Brasil; aperta por Köppen×mês na M4
   t2m:      {min: 228.15, max: 323.15}   # -45 °C .. +50 °C
@@ -20,7 +20,16 @@ persistence:
 spatial:
   neighbors_k: 5
   radius_km: 300
-  max_mad_z: 5.0    # |desvio vs mediana dos vizinhos| / MAD
+  max_mad_z: 5.0    # |desvio vs mediana dos vizinhos| / max(1.4826*MAD, sigma_floor)
+  # ADR-0003: com k<=5 vizinhos e resolução 0.1, MAD colapsa a ~0 e o z explode
+  # em leituras normais (6-9% de flags observados sem piso). O piso limita a
+  # sensibilidade: flag exige |desvio| > max_mad_z * sigma_floor (7.5 K / 7.5 m/s).
+  sigma_floor:
+    t2m: 1.5        # K — spread real intra-300km (microclima/altitude) não é erro
+    wind10m: 1.5    # m/s — heterogeneidade de exposição do sítio é real
+  # Chuva convectiva horária é espacialmente esparsa por natureza: flagar picos
+  # reais enviesaria a verificação CONTRA eventos extremos (o que queremos medir).
+  exempt_variables: [precip_1h]
 
 metadata:
   max_elev_diff_m: 100          # |elev_metadado - elev_DEM| acima disso => bit METADATA
