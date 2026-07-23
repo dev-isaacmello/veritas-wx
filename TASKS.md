@@ -98,4 +98,14 @@
 - [ ] Rodada final das figuras com 4 modelos × 12 meses
 - [ ] Publicação do dataset (dry-run)
 ## M8 — 3 figuras + notebook + publicação dataset        [ ]
+## WB-ports — auditoria WB2/WBX + 5 portes (ADR-0004)    [x]
+- [x] Auditorias código-a-código: WB2 (zero estações/IC/QC) e WBX (parcial:
+      obs esparsas + inferência boa; representatividade/QC/regime/FDR = 0 hits)
+- [x] Ajuste de vento por altitude (Ingleby 2014) — wind10m ganha fcst_elev_adj
+- [x] t-tests Geer AR(2) + HAC Lazarus + pareado Diebold-Mariano (analyze/ttest.py)
+- [x] Peso por densidade de estações (Rodwell 2010) — corrige viés Sudeste
+- [x] Climatologia por estação (doy×hora, janela circular 61d) — habilita ACC/baselines
+- [x] SEEPS por estação com IC de bootstrap (nem ECMWF/Google publicam assim)
+- Tudo diagnóstico EXPLORATÓRIO — registry congelado até emenda versionada
+
 ## M9 — serve/ (FastAPI read-only)                       [ ]

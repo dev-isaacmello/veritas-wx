@@ -17,3 +17,6 @@ dist/
 # local scratch
 *.tmp
 .DS_Store
+
+# upstream clones for code-audit/porting (not ours, not tracked)
+vendor/
