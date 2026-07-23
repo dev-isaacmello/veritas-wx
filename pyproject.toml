@@ -44,6 +44,11 @@ graphcast = [
 scores = [
     "scoringrules>=0.7",
 ]
+# M8 figures + report notebook
+figures = [
+    "matplotlib>=3.9",
+    "jupyter>=1.0",
+]
 
 [build-system]
 requires = ["hatchling"]
