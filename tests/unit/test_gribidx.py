@@ -55,6 +55,15 @@ def test_coalesce_merges_contiguous_messages():
     assert merged == [(1020000, 4900000)]
 
 
+def test_gfs_duplicate_descriptor_deduped_first_wins():
+    # field-observed NCEP quirk: identical APCP descriptor at two offsets
+    dup = GFS_IDX + "8:5500000:d=2025070100:APCP:surface:0-6 hour acc fcst:\n"
+    picked = select_gfs(parse_gfs_idx(dup))
+    apcp = [e for e in picked if e.var == "APCP"]
+    assert len(apcp) == 1
+    assert apcp[0].start == 4200000  # first occurrence kept
+
+
 ECMWF_INDEX = (
     '{"domain": "g", "date": "20250701", "time": "0000", "step": "6", "levtype": "sfc", '
     '"param": "2t", "_offset": 1000, "_length": 500}\n'

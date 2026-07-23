@@ -70,8 +70,25 @@ def select_gfs(
     entries: list[IdxEntry],
     wanted: frozenset[tuple[str, str]] = GFS_WANTED,
 ) -> list[IdxEntry]:
-    """Keep only the (var, level) pairs we need, preserving file order."""
-    return [e for e in entries if (e.var, e.level) in wanted]
+    """Keep only the (var, level) pairs we need, preserving file order.
+
+    Field-observed NCEP quirk (2026-07): pgrb2 files can ship the SAME message
+    descriptor twice (e.g. two "APCP:surface:0-6 hour acc fcst" entries at
+    different offsets). We keep the FIRST occurrence of an exact
+    (var, level, meta) descriptor — deterministic, and downstream
+    by_short_name() would refuse duplicates anyway.
+    """
+    seen: set[tuple[str, str, str]] = set()
+    out: list[IdxEntry] = []
+    for e in entries:
+        if (e.var, e.level) not in wanted:
+            continue
+        key = (e.var, e.level, e.meta)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    return out
 
 
 def parse_ecmwf_index(text: str) -> list[IdxEntry]:
