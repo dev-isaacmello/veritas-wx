@@ -1,59 +1,62 @@
-# Contributing to veritas-wx
+# Contribuindo com o veritas-wx
 
-Thanks for considering a contribution. This project values **scientific discipline over feature
-count** — the rules below exist so the dataset stays trustworthy.
+🇧🇷 Português · [🇺🇸 English](CONTRIBUTING.en.md)
 
-## Dev setup
+Obrigado por considerar contribuir. Este projeto valoriza **disciplina científica acima de
+contagem de features** — as regras abaixo existem para o dataset continuar confiável.
+
+## Setup de desenvolvimento
 
 ```bash
 git clone https://github.com/dev-isaacmello/veritas-wx.git
 cd veritas-wx
-uv sync --group dev            # + --group grib --group geo --group graphcast as needed
+uv sync --group dev            # + --group grib --group geo --group graphcast conforme necessário
 uv run pytest -m "not network and not slow"
-uv run ruff check src/ scripts/ tests/
+uv run ruff check .
 ```
 
-Tests marked `network` hit live buckets/APIs and are excluded from CI; run them locally before
-touching any fetcher. Tests marked `slow` (bootstrap coverage properties) run with
-`uv run pytest -m slow`.
+Testes marcados `network` batem em buckets/APIs reais e ficam fora do CI; rode-os localmente
+antes de mexer em qualquer fetcher. Testes `slow` (propriedades de cobertura do bootstrap) rodam
+com `uv run pytest -m slow`.
 
-## The rules that are not negotiable
+## As regras que não são negociáveis
 
-1. **No estimate without a confidence interval.** Public functions in `analyze/` return
-   `BootstrapResult` (or `TTestResult`), never a bare float. There is a test that enforces this;
-   do not fight it.
-2. **The registry is frozen.** `metrics_registry.yaml` is pre-registered. New metrics enter as
-   *exploratory diagnostics* (documented as such in their docstrings). Promotion to confirmatory
-   requires a versioned registry amendment in its own PR, with its own BH family.
-3. **Flag, never delete.** QC sets bits; consumers choose rigor via mask. Deleting observations
-   is a bug, not a cleanup.
-4. **NULL, never imputed.** A missing hour is a missing hour. Precip 24h totals require ≥22 clean
-   hourly readings; partial sums are forbidden.
-5. **Every stage reconciles.** `rows_in == rows_out + sum(itemized drops)` — the runlog raises
-   otherwise. If you add a filter, add its drop counter.
-6. **Pure functions in `analyze/`.** No I/O, no hidden randomness — RNGs are explicit arguments.
-7. **Idempotent ingestion.** Downloads go through sha256 manifests; re-running must be a no-op
-   for verified artifacts.
+1. **Nenhuma estimativa sem intervalo de confiança.** Funções públicas em `analyze/` retornam
+   `BootstrapResult` (ou `TTestResult`), nunca um float nu. Existe um teste que impõe isso;
+   não brigue com ele.
+2. **O registro é congelado.** `metrics_registry.yaml` é pré-registrado. Métricas novas entram
+   como *diagnósticos exploratórios* (documentado nas docstrings). Promoção a confirmatória exige
+   emenda versionada do registro em PR próprio, com família BH própria.
+3. **Flagar, nunca deletar.** O QC seta bits; o consumidor escolhe o rigor via máscara. Deletar
+   observação é bug, não limpeza.
+4. **NULL, nunca imputado.** Hora faltante é hora faltante. Totais de precip 24h exigem ≥22
+   leituras horárias limpas; somas parciais são proibidas.
+5. **Todo estágio reconcilia.** `linhas_entrada == linhas_saída + soma(drops itemizados)` — o
+   runlog levanta exceção caso contrário. Se você adiciona um filtro, adiciona o contador do drop.
+6. **Funções puras em `analyze/`.** Sem I/O, sem aleatoriedade escondida — RNGs são argumentos
+   explícitos.
+7. **Ingestão idempotente.** Downloads passam por manifests sha256; re-rodar precisa ser no-op
+   para artefatos verificados.
 
-## Style
+## Estilo
 
-- Python 3.12, `ruff` (line length 100) — CI runs it
-- Docstrings carry the documentation; avoid inline `#` comments (functional pragmas like
-  `# noqa` are fine)
-- Golden tests: when porting a formula, hand-compute at least one case in the test's docstring
-- Ported code (e.g. from WeatherBench-X, Apache 2.0) keeps an attribution line in the module
-  docstring
+- Python 3.12, `ruff` (linha 100) — o CI roda
+- Docstrings carregam a documentação; evite comentários inline `#` (pragmas funcionais como
+  `# noqa` são ok)
+- Golden tests: ao portar uma fórmula, calcule à mão pelo menos um caso na docstring do teste
+- Código portado (ex.: WeatherBench-X, Apache 2.0) mantém a linha de atribuição no docstring
+  do módulo
 
-## Good first contributions
+## Boas primeiras contribuições
 
-- New QC checks (with golden tests and an entry in the bitmask contract)
-- Station networks beyond INMET (the `duplicate_check` already supports cross-network)
-- Metric ports from the literature as exploratory diagnostics
-- Performance work on the bootstrap fast-paths
+- Novos checks de QC (com golden tests e entrada no contrato do bitmask)
+- Redes de estações além do INMET (o `duplicate_check` já suporta cross-network)
+- Portes de métricas da literatura como diagnósticos exploratórios
+- Performance nos fast-paths do bootstrap
 
 ## Pull requests
 
-- One logical change per PR; tests green (`not network and not slow` suite) and ruff clean
-- If your change affects data semantics (units, conventions, thresholds), say so explicitly in
-  the PR description — those bump `ingest_version`
-- English for code/commits; PT-BR welcome in issues and discussions
+- Uma mudança lógica por PR; testes verdes (suíte `not network and not slow`) e ruff limpo
+- Se a mudança afeta semântica de dados (unidades, convenções, limiares), diga explicitamente
+  na descrição — isso versiona o `ingest_version`
+- Inglês em código/commits; PT-BR bem-vindo em issues e discussões
