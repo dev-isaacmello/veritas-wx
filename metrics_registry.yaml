@@ -1,0 +1,160 @@
+# =============================================================================
+# metrics_registry.yaml — PRÉ-REGISTRO (não-negociável científico #4)
+# =============================================================================
+# Commitado ANTES de qualquer run de análise; o histórico git é a prova.
+# Métrica adicionada DEPOIS do primeiro run entra com `post_hoc: true` e em
+# família separada. Alterar definição de métrica registrada = nova versão + ADR.
+# =============================================================================
+
+version: 1
+registered_at: "2026-07-23"
+status: pre_registered   # muda para `locked` no primeiro run de análise
+
+defaults:
+  alpha: 0.05
+  n_boot: 1000
+  ci: percentile                # IC percentil 2.5–97.5
+  resample_unit: day_blocks     # blocos contíguos de DIAS de init_time; todas as
+                                # estações e ambos os runs (00Z/12Z) do bloco movem
+                                # juntos — preserva correlação temporal E espacial
+  block_length:
+    method: politis_white       # automático, sobre a série diária do erro médio
+    series: daily_domain_mean_error   # por (model, variable, lead)
+    clamp_days: [2, 30]
+  fdr:
+    method: benjamini_hochberg
+    q: 0.05
+    scope: family               # aplicado sobre a família completa do run;
+                                # n_family gravado em toda linha de resultado
+
+strata:
+  season: [DJF, MAM, JJA, SON]
+  koppen_level1: [A, B, C]      # classes presentes no Brasil
+  enso:                         # ONI mensal (CPC), limiar ±0.5 °C
+    el_nino: "oni >= 0.5"
+    neutral: "-0.5 < oni < 0.5"
+    la_nina: "oni <= -0.5"
+  mjo_phase: ["1","2","3","4","5","6","7","8","inactive"]  # RMM (BoM); ativo se amplitude >= 1
+  obs_percentile_bin:           # percentil empírico da obs em (estação, variável),
+                                # janela completa de 12 meses
+    ["0-10","10-20","20-30","30-40","40-50","50-60","60-70","70-80","80-90","90-99","99-100"]
+
+# -----------------------------------------------------------------------------
+# Métricas convencionais
+# -----------------------------------------------------------------------------
+metrics:
+  - name: mae
+    definition: "mean(|fcst - obs|)"
+    fcst_input: elev_adj_when_available   # t2m usa fcst_elev_adj; demais fcst_raw
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global, season, koppen_level1, enso, mjo_phase]
+
+  - name: rmse
+    definition: "sqrt(mean((fcst - obs)^2))"
+    fcst_input: elev_adj_when_available
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global, season, koppen_level1, enso, mjo_phase]
+
+  - name: bias
+    definition: "mean(fcst - obs)"
+    fcst_input: elev_adj_when_available
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global, season, koppen_level1, enso, mjo_phase]
+
+  # Decomposição de representatividade (não-negociável #1) — 3 linhas acopladas
+  - name: mse_total
+    definition: "mean((fcst - obs)^2), somente pares com repr_floor não-nulo"
+    decomp_group: representativeness
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global]
+
+  - name: repr_floor_mean
+    definition: "média de repr_floor sobre os mesmos pares de mse_total"
+    decomp_group: representativeness
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global]
+
+  - name: mse_model_est
+    definition: "max(mse_total - repr_floor_mean, 0); flag quando o clip em 0 atua"
+    decomp_group: representativeness
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global]
+
+# -----------------------------------------------------------------------------
+# Métricas assinatura do projeto
+# -----------------------------------------------------------------------------
+  - name: variance_ratio
+    definition: >
+      sigma(fcst)/sigma(obs) sobre pares casados por (model, variable, lead, station);
+      agregação entre estações: mediana. Recalculada por draw do bootstrap.
+    fcst_input: raw               # variância não é afetada por offset de elevação,
+                                  # mas mantemos raw por pureza de definição
+    variables: [t2m, wind10m, precip_24h]
+    strata: [global, season]
+
+  - name: bias_by_percentile
+    definition: >
+      mean(fcst - obs) condicionado ao bin de percentil climatológico-empírico da
+      obs em (estação, variável), janela completa; bins do stratum obs_percentile_bin
+    fcst_input: elev_adj_when_available
+    variables: [t2m, precip_24h]
+    strata: [obs_percentile_bin]
+
+  - name: regime_stratified_skill
+    definition: "mae, rmse, bias e variance_ratio × todos os estratos de regime"
+    composite_of: [mae, rmse, bias, variance_ratio]
+    variables: [t2m, wind10m, precip_24h]
+    strata: [season, koppen_level1, enso, mjo_phase]
+
+# -----------------------------------------------------------------------------
+# Registradas agora, NÃO computadas na Fase 1 (sistemas determinísticos na
+# forma pública usada) — registro antecipado elimina liberdade de escolha futura
+# -----------------------------------------------------------------------------
+  - name: crps
+    requires: ensemble
+    phase1: not_computed
+  - name: brier
+    requires: ensemble
+    thresholds_precip_24h_mm: [1, 10, 25, 50]
+    phase1: not_computed
+  - name: reliability
+    requires: ensemble
+    phase1: not_computed
+
+# -----------------------------------------------------------------------------
+# Hipóteses pré-registradas (direcionais, definidas antes de olhar qualquer dado)
+# -----------------------------------------------------------------------------
+hypotheses:
+  H1:
+    statement: >
+      Modelos de IA treinados com MSE (AIFS, GraphCast) exibem variance_ratio < 1
+      com queda monotônica ao longo do lead time, mais acentuada que em HRES/GFS.
+    metric: variance_ratio
+    direction: "< 1, decrescente em lead"
+  H2:
+    statement: >
+      O viés de precipitação condicionado ao percentil observado é negativo nos
+      bins altos (>= 90) e cresce em magnitude com o percentil, em todos os modelos.
+    metric: bias_by_percentile
+    direction: "negativo e decrescente nos bins altos"
+  H3:
+    statement: >
+      A skill relativa entre modelos não é uniforme entre regimes: existe ao menos
+      uma inversão de ranking (par de modelos) entre estratos de Köppen ou ENSO
+      que sobrevive ao controle BH.
+    metric: regime_stratified_skill
+
+# -----------------------------------------------------------------------------
+# Famílias de teste para correção BH (o produto cartesiano é materializado e
+# contado no momento do run; n_family acompanha cada resultado)
+# -----------------------------------------------------------------------------
+families:
+  phase1_headline:
+    description: "Diferenças pareadas de score entre modelos, agregado global"
+    tests: "pares_de_modelos(6) × variables(3) × leads(40) × {mae, rmse, bias}"
+  phase1_signature:
+    description: "Hipóteses H1 e H2"
+    tests: "H1: models(4) × variables(3) × leads(40); H2: models(4) × bins(11) × {t2m, precip_24h}"
+  phase1_regimes:
+    description: "H3 — estratificação por regime"
+    tests: "pares_de_modelos(6) × variables(3) × leads_reduzidos(24,72,120,168,240) × estratos"
