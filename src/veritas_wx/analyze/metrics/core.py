@@ -3,9 +3,12 @@
 Two layers, both pure:
 
 - ``*_stat`` functions: scalar statistics over a matched-pairs DataFrame with
-  columns ``(fcst, obs [, station_id, day])``. These are the resample-able
-  building blocks handed to the bootstrap; they return bare floats and are
-  NOT part of the public estimate API.
+  columns ``(fcst, obs [, station_id, day, weight])``. These are the
+  resample-able building blocks handed to the bootstrap; they return bare
+  floats and are NOT part of the public estimate API. When an optional
+  ``weight`` column is present (station-density weights,
+  :mod:`veritas_wx.analyze.weighting`), the mean-based statistics become
+  weighted means; behaviour is unchanged when it is absent.
 - Public functions (``mae``, ``rmse``, ``bias``, ``variance_ratio``,
   ``bias_by_percentile``): every one of them routes through
   :func:`veritas_wx.analyze.bootstrap.moving_block_bootstrap` and returns a
@@ -41,20 +44,35 @@ REGISTRY_BINS: tuple[str, ...] = (
 )
 
 
+def _mean_stat(df: pl.DataFrame, expr: pl.Expr) -> float:
+    """Mean of ``expr`` over the frame; weighted by ``weight`` when present.
+
+    The weighted form is ``sum(weight * expr) / sum(weight)`` — with the
+    mean-1 normalized station-density weights of
+    :func:`veritas_wx.analyze.weighting.station_density_weights` this keeps
+    the statistic on the same scale as the unweighted mean. Weights must be
+    non-null on every row when the column exists.
+    """
+    if "weight" in df.columns:
+        return float(
+            df.select((expr * pl.col("weight")).sum() / pl.col("weight").sum()).item()
+        )
+    return float(df.select(expr.mean()).item())
+
+
 def mae_stat(df: pl.DataFrame) -> float:
-    """Registry ``mae``: mean(|fcst - obs|)."""
-    return float(df.select((pl.col("fcst") - pl.col("obs")).abs().mean()).item())
+    """Registry ``mae``: mean(|fcst - obs|), density-weighted when ``weight`` exists."""
+    return _mean_stat(df, (pl.col("fcst") - pl.col("obs")).abs())
 
 
 def rmse_stat(df: pl.DataFrame) -> float:
-    """Registry ``rmse``: sqrt(mean((fcst - obs)^2))."""
-    mse = float(df.select(((pl.col("fcst") - pl.col("obs")) ** 2).mean()).item())
-    return math.sqrt(mse)
+    """Registry ``rmse``: sqrt(mean((fcst - obs)^2)), density-weighted when ``weight`` exists."""
+    return math.sqrt(_mean_stat(df, (pl.col("fcst") - pl.col("obs")) ** 2))
 
 
 def bias_stat(df: pl.DataFrame) -> float:
-    """Registry ``bias``: mean(fcst - obs)."""
-    return float(df.select((pl.col("fcst") - pl.col("obs")).mean()).item())
+    """Registry ``bias``: mean(fcst - obs), density-weighted when ``weight`` exists."""
+    return _mean_stat(df, pl.col("fcst") - pl.col("obs"))
 
 
 def _station_variance_ratios(df: pl.DataFrame) -> pl.DataFrame:
@@ -90,7 +108,9 @@ def variance_ratio_stat(df: pl.DataFrame) -> float:
     fewer than 2 pairs in the draw) are EXCLUDED from the median; they are
     counted per draw via :func:`_station_variance_ratios` for diagnostics.
     Returns NaN when every station is excluded (the bootstrap propagates it
-    into the draws rather than inventing a value).
+    into the draws rather than inventing a value). An optional ``weight``
+    column is deliberately ignored here: the statistic is a median over
+    stations, not a mean over pairs, so density weighting does not apply.
     """
     ratios = _station_variance_ratios(df)["ratio"].drop_nulls().to_numpy()
     if ratios.size == 0:
