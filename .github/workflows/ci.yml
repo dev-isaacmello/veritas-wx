@@ -13,6 +13,6 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - run: uv sync --group dev
+      - run: uv sync --group dev --group grib --group geo --group graphcast
       - run: uv run ruff check .
       - run: uv run pytest -m "not network and not slow"
